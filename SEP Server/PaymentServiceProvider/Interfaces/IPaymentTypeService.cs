@@ -6,7 +6,8 @@ namespace PaymentServiceProvider.Interfaces
     {
         Task<List<PaymentType>> GetAllPaymentTypes();
         Task<PaymentType> GetPaymentType(string paymentTypeName);
-        Task AddPaymentType(PaymentType paymentType);
+        Task<List<PaymentType>> GetAllPaymentTypesByClientId(int clientId);
+        Task<List<PaymentType>> AddPaymentType(PaymentType paymentType);
         Task<bool> RemovePaymentType(int id);
     }
 }

@@ -23,6 +23,23 @@ namespace PaymentServiceProvider.Controllers
             return Ok(await _paymentTypeService.GetAllPaymentTypes());
         }
 
+        [HttpGet("{clientId}")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PaymentType>))]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetAllPaymentTypesByClientId(int clientId)
+        {
+            try
+            {
+                var paymentTypes = await _paymentTypeService.GetAllPaymentTypesByClientId(clientId);
+                return Ok(paymentTypes);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PaymentType))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -31,9 +48,8 @@ namespace PaymentServiceProvider.Controllers
         {
             try
             {
-                await _paymentTypeService.AddPaymentType(paymentType);
-                var allPaymentTypes = await _paymentTypeService.GetAllPaymentTypes();
-                return Ok(allPaymentTypes);
+                var paymentTypes = await _paymentTypeService.AddPaymentType(paymentType);
+                return Ok(paymentTypes);
             }
             catch (Exception ex)
             {

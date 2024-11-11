@@ -6,14 +6,16 @@ namespace PaymentServiceProvider.Services
 {
     public class PaymentTypeService : IPaymentTypeService
     {
-        private readonly IPaymentTypeRepository _paymentTypeRepository;
+        private readonly IPaymentTypeRepository _paymentTypeRepository;   
+        private readonly IWebShopClientRepository _webShopClientRepository;
 
-        public PaymentTypeService(IPaymentTypeRepository paymentTypeRepository)
+        public PaymentTypeService(IPaymentTypeRepository paymentTypeRepository, IWebShopClientRepository webShopClientRepository)
         {
             _paymentTypeRepository = paymentTypeRepository;
+            _webShopClientRepository = webShopClientRepository;
         }
 
-        public async Task AddPaymentType(PaymentType paymentType)
+        public async Task<List<PaymentType>> AddPaymentType(PaymentType paymentType)
         {
             var existingPaymentType = await _paymentTypeRepository.GetPaymentTypeByName(paymentType.Name);
 
@@ -21,12 +23,24 @@ namespace PaymentServiceProvider.Services
                 throw new Exception($"Payment {paymentType.Name} already exists!");
 
             await _paymentTypeRepository.Add(paymentType);
+            return await GetAllPaymentTypes();
         }
 
         public async Task<List<PaymentType>> GetAllPaymentTypes()
         {
             IEnumerable<PaymentType> PaymentTypes = await _paymentTypeRepository.GetAll();
             return PaymentTypes.ToList();
+        }
+
+        public async Task<List<PaymentType>> GetAllPaymentTypesByClientId(int clientId)
+        {
+            WebShopClient webShopClient = await _webShopClientRepository.Get(clientId);
+
+            if (webShopClient == null)
+                throw new Exception($"WebShop Client with id {clientId} does not exist!");
+
+            List<PaymentType> paymentTypes = webShopClient.PaymentTypes;
+            return paymentTypes;
         }
 
         public async Task<PaymentType> GetPaymentType(string paymentTypeName)
