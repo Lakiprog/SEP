@@ -1,0 +1,6 @@
+@PaymenServiceProvider_HostAddress = http://localhost:5181
+
+GET {{PaymenServiceProvider_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
