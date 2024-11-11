@@ -3,19 +3,19 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35327.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Telecom", "LoginService\Telecom.csproj", "{DB6BBE01-5D00-4565-B0A4-555B0A07E8B4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PaymentServiceProvider", "PaymentServiceProvider\PaymentServiceProvider.csproj", "{301FDE89-D6C2-4F79-9A93-FD1A3EF566CD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaymentServiceProvider", "PaymenServiceProvider\PaymentServiceProvider.csproj", "{301FDE89-D6C2-4F79-9A93-FD1A3EF566CD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BankService", "BankService\BankService.csproj", "{49B5A965-F588-4B54-906C-4976A37963BD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BankService", "BankService\BankService.csproj", "{49B5A965-F588-4B54-906C-4976A37963BD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BitcoinPaymentService", "BitcoinPaymentService\BitcoinPaymentService.csproj", "{BAF0DD09-D615-45B0-B82A-0E35694306AB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BitcoinPaymentService", "BitcoinPaymentService\BitcoinPaymentService.csproj", "{BAF0DD09-D615-45B0-B82A-0E35694306AB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PaymentCardCenterService", "PaymentCardCenterService\PaymentCardCenterService.csproj", "{FA674414-32F8-40E3-BDB2-9669B69CB20D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaymentCardCenterService", "PaymentCardCenterService\PaymentCardCenterService.csproj", "{FA674414-32F8-40E3-BDB2-9669B69CB20D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PayPalPaymentService", "PayPalPaymentService\PayPalPaymentService.csproj", "{00B0D408-6AED-4A2B-B749-136DAEB535F4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PayPalPaymentService", "PayPalPaymentService\PayPalPaymentService.csproj", "{00B0D408-6AED-4A2B-B749-136DAEB535F4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gateway", "Gateway\Gateway.csproj", "{33688399-7FA8-4B07-924A-147975AFF35A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gateway", "Gateway\Gateway.csproj", "{33688399-7FA8-4B07-924A-147975AFF35A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Telecom", "Telecom\Telecom.csproj", "{CBCA1226-E37D-45A7-8EF9-EA0A84E39F31}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +23,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{DB6BBE01-5D00-4565-B0A4-555B0A07E8B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DB6BBE01-5D00-4565-B0A4-555B0A07E8B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DB6BBE01-5D00-4565-B0A4-555B0A07E8B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DB6BBE01-5D00-4565-B0A4-555B0A07E8B4}.Release|Any CPU.Build.0 = Release|Any CPU
 		{301FDE89-D6C2-4F79-9A93-FD1A3EF566CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{301FDE89-D6C2-4F79-9A93-FD1A3EF566CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{301FDE89-D6C2-4F79-9A93-FD1A3EF566CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -51,6 +47,10 @@ Global
 		{33688399-7FA8-4B07-924A-147975AFF35A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{33688399-7FA8-4B07-924A-147975AFF35A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{33688399-7FA8-4B07-924A-147975AFF35A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CBCA1226-E37D-45A7-8EF9-EA0A84E39F31}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CBCA1226-E37D-45A7-8EF9-EA0A84E39F31}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CBCA1226-E37D-45A7-8EF9-EA0A84E39F31}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CBCA1226-E37D-45A7-8EF9-EA0A84E39F31}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
