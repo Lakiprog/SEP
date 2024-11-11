@@ -11,8 +11,13 @@ code {
 }
 
 .registration-form {
-  margin-top: 20px;
   align-content: center;
   min-width: 400px;
   max-width: 600px;
+  margin: 20px;
+}
+
+.card-title {
+  font-size: 25px;
+  align-self: center;
 }

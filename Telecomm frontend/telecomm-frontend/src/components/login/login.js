@@ -1,9 +1,10 @@
 import React from "react";
 import HomeNavbar from "../navbars/homeNavbar";
-import { Button, Card, CardBody, CardTitle, Form, FormFeedback, FormGroup, Input, Label } from "reactstrap";
+import { Button, Card, CardBody, CardTitle, Form, FormFeedback, FormGroup, Label } from "reactstrap";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { LoginValidation } from "./loginValidation";
+import { useNavigate } from "react-router-dom";
 import FormInput from "../common/formInput";
 
 const Login = (props) => {
@@ -16,8 +17,14 @@ const Login = (props) => {
     mode: "onChange",
   });
 
+  const navigate = useNavigate();
+
   const login = (data) => {
-    console.log(data);
+    if (data.Username === "admin") {
+      navigate("/paymentTypes");
+    } else {
+      navigate("/packageDealsUser");
+    }
   };
 
   return (
