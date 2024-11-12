@@ -11,6 +11,15 @@ namespace PaymentServiceProvider.Data.Configuration
             builder.HasKey(x => x.Id);
             builder.Property(x => x.Id)
                 .ValueGeneratedOnAdd();
+
+            builder.HasMany(x => x.Transactions)
+               .WithOne(x => x.WebShopClient)
+               .HasForeignKey(x => x.WebShopClientId)
+               .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(x => x.PaymentTypes)
+               .WithMany() // No back reference in PaymentType
+               .UsingEntity(j => j.ToTable("WebShopClientPaymentTypes")); // Join table
         }
     }
 }

@@ -12,6 +12,11 @@ namespace PaymentServiceProvider.Data.Configuration
             builder.Property(x => x.Id)
                 .ValueGeneratedOnAdd();
 
+            builder.HasOne(x => x.WebShopClient)
+               .WithMany(x => x.Transactions)
+               .HasForeignKey(x => x.WebShopClientId)
+               .IsRequired()
+               .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

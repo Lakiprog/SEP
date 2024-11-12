@@ -8,5 +8,6 @@
         public int MerchantOrderID { get; set; }
         public DateTime MerchantTimestamp { get; set; }
         public string ReturnURL { get; set; }
+        public WebShopClient WebShopClient { get; set; }
     }
 }

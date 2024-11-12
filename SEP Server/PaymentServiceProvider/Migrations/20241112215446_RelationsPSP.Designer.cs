@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PaymentServiceProvider.Data;
 
@@ -11,9 +12,11 @@ using PaymentServiceProvider.Data;
 namespace PaymentServiceProvider.Migrations
 {
     [DbContext(typeof(PaymentServiceProviderDbContext))]
-    partial class PaymentServiceProviderDbContextModelSnapshot : ModelSnapshot
+    [Migration("20241112215446_RelationsPSP")]
+    partial class RelationsPSP
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,7 +37,12 @@ namespace PaymentServiceProvider.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("WebShopClientId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("WebShopClientId");
 
                     b.ToTable("PaymentTypes");
                 });
@@ -99,19 +107,11 @@ namespace PaymentServiceProvider.Migrations
                     b.ToTable("WebShopClients");
                 });
 
-            modelBuilder.Entity("PaymentTypeWebShopClient", b =>
+            modelBuilder.Entity("PaymentServiceProvider.Models.PaymentType", b =>
                 {
-                    b.Property<int>("PaymentTypesId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("WebShopClientId")
-                        .HasColumnType("int");
-
-                    b.HasKey("PaymentTypesId", "WebShopClientId");
-
-                    b.HasIndex("WebShopClientId");
-
-                    b.ToTable("WebShopClientPaymentTypes", (string)null);
+                    b.HasOne("PaymentServiceProvider.Models.WebShopClient", null)
+                        .WithMany("PaymentTypes")
+                        .HasForeignKey("WebShopClientId");
                 });
 
             modelBuilder.Entity("PaymentServiceProvider.Models.Transaction", b =>
@@ -125,23 +125,10 @@ namespace PaymentServiceProvider.Migrations
                     b.Navigation("WebShopClient");
                 });
 
-            modelBuilder.Entity("PaymentTypeWebShopClient", b =>
-                {
-                    b.HasOne("PaymentServiceProvider.Models.PaymentType", null)
-                        .WithMany()
-                        .HasForeignKey("PaymentTypesId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PaymentServiceProvider.Models.WebShopClient", null)
-                        .WithMany()
-                        .HasForeignKey("WebShopClientId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("PaymentServiceProvider.Models.WebShopClient", b =>
                 {
+                    b.Navigation("PaymentTypes");
+
                     b.Navigation("Transactions");
                 });
 #pragma warning restore 612, 618
