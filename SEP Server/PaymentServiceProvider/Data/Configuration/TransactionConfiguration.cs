@@ -11,6 +11,7 @@ namespace PaymentServiceProvider.Data.Configuration
             builder.HasKey(x => x.Id);
             builder.Property(x => x.Id)
                 .ValueGeneratedOnAdd();
+
         }
     }
 }

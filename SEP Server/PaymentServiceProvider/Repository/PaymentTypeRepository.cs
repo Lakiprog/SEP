@@ -1,7 +1,7 @@
-﻿using PaymentServiceProvider.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using PaymentServiceProvider.Data;
 using PaymentServiceProvider.Interfaces;
 using PaymentServiceProvider.Models;
-using System.Data.Entity;
 
 namespace PaymentServiceProvider.Repository
 {
