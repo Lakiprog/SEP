@@ -1,4 +1,10 @@
+using Microsoft.EntityFrameworkCore;
+using PaymentServiceProvider.Data;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<PaymentServiceProviderDbContext>(opt => opt.UseSqlServer(builder.Configuration.GetConnectionString("PSPDB")));
+
 
 // Add services to the container.
 
