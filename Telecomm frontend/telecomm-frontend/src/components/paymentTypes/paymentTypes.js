@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 import { Button, Card, CardBody, CardTitle, ListGroup, ListGroupItem } from "reactstrap";
 import AdminNavbar from "../navbars/adminNavbar";
 
@@ -11,6 +12,23 @@ const PaymentTypes = (props) => {
     { Id: 3, Name: "Bitcoin" },
     { Id: 4, Name: "Paypal" },
   ]);
+
+  useEffect(() => {
+    axios
+      .get("https://localhost:61630/api/payment-types", {
+        // withCredentials: true,
+        // credentials: "include", // "same-origin",
+        mode: "no-cors",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        cache: false,
+      })
+      .then((resp) => {
+        console.log(resp);
+      });
+  }, []);
 
   const onDelete = () => {};
 
@@ -38,7 +56,7 @@ const PaymentTypes = (props) => {
         <CardTitle>Missing Payment Types</CardTitle>
         <CardBody>
           <ListGroup>
-            {clientPaymentTypes.map((paymentType) => (
+            {missingPaymentTypes.map((paymentType) => (
               <ListGroupItem key={paymentType.Id} action tag="button">
                 <Button color="primary" style={{ marginBottom: "5px", marginLeft: "10px", marginRight: "10px" }} onClick={() => onAdd(paymentType)}>
                   Add

@@ -4,6 +4,8 @@ import UserNavbar from "../navbars/userNavbar";
 import PaymentNavbar from "../navbars/paymentNavbar";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.min.css";
+import { useNavigate } from "react-router-dom";
+import PaymentContainer from "../paymentContainer/paymentContainer";
 
 const PackageDealsUser = (props) => {
   const CreditCard = 1;
@@ -17,6 +19,7 @@ const PackageDealsUser = (props) => {
     { Id: 3, Name: "SBB Telephone", Price: 10.0 },
   ]);
   const [selectedPackage, setSelectedPackage] = useState(null);
+  const [selectedPaymentType, setSelectedPaymentType] = useState(null);
   const [paymentTypes, setPaymentTypes] = useState([
     { Id: 1, Name: "Credit Card" },
     { Id: 2, Name: "QR" },
@@ -32,10 +35,14 @@ const PackageDealsUser = (props) => {
     //TODO
   };
 
+  const onPayed = () => {
+    //TODO
+  };
+
   const onPaymentSelected = (paymentType) => {
     switch (paymentType.Id) {
       case CreditCard:
-        //TODO
+        setSelectedPaymentType(paymentType);
         break;
       case QR:
         toast.success("Successful payment");
@@ -74,8 +81,10 @@ const PackageDealsUser = (props) => {
             </CardBody>
           </Card>
         </>
-      ) : (
+      ) : !selectedPaymentType ? (
         <PaymentNavbar paymentTypes={paymentTypes} onSelected={onPaymentSelected} onCancel={() => setSelectedPackage(null)} />
+      ) : (
+        <PaymentContainer onPay={onPayed} paymentType={selectedPaymentType} />
       )}
     </div>
   );
