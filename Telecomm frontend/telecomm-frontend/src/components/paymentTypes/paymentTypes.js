@@ -15,7 +15,7 @@ const PaymentTypes = (props) => {
 
   useEffect(() => {
     axios
-      .get("https://localhost:61630/api/payment-types", {
+      .get("https://localhost:7115/api/payment-types", {
         // withCredentials: true,
         // credentials: "include", // "same-origin",
         mode: "no-cors",
