@@ -17,7 +17,7 @@ namespace PaymentServiceProvider.Controllers
         }
 
         [HttpGet]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<PaymentType>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PaymentType>))]
         public async Task<IActionResult> GetAllPaymentTypes()
         {
             return Ok(await _paymentTypeService.GetAllPaymentTypes());
@@ -41,7 +41,7 @@ namespace PaymentServiceProvider.Controllers
         }
 
         [HttpPost]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PaymentType))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PaymentType>))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> AddPaymentType([FromBody] PaymentType paymentType)

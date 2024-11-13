@@ -7,10 +7,12 @@ namespace PaymentServiceProvider.Services
     public class TransactionService : ITransactionService
     {
         private readonly ITransactionRepository _transactionRepository;
+        private readonly IWebShopClientRepository _webShopClientRepository;
 
-        public TransactionService(ITransactionRepository transactionRepository)
+        public TransactionService(ITransactionRepository transactionRepository, IWebShopClientRepository webShopClientRepository)
         {
             _transactionRepository = transactionRepository;
+            _webShopClientRepository = webShopClientRepository;
         }
 
         public async Task<Transaction> AddTransaction(Transaction transaction)
@@ -48,6 +50,17 @@ namespace PaymentServiceProvider.Services
         public async Task<Transaction> GetById(int id)
         {
             return await _transactionRepository.Get(id);
+        }
+
+        public async Task<List<Transaction>> GetAllTransactionsByWebShopClientId(int webShopClientId)
+        {
+            WebShopClient webShopClient = await _webShopClientRepository.Get(webShopClientId);
+
+            if (webShopClient == null)
+                throw new Exception($"WebShop Client with id {webShopClientId} does not exist!");
+
+            List<Transaction> transactions = webShopClient.Transactions;
+            return transactions;
         }
     }
 }
