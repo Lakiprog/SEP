@@ -1,38 +1,47 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { Button, Card, CardBody, CardTitle, ListGroup, ListGroupItem } from "reactstrap";
 import AdminNavbar from "../navbars/adminNavbar";
+import httpRequest from "../common/httpRequest";
+import * as constants from "../common/constants";
 
 const PaymentTypes = (props) => {
-  const [clientPaymentTypes, setClientPaymentTypes] = useState([
-    { Id: 1, Name: "Credit Card" },
-    { Id: 2, Name: "QR" },
-  ]);
-  const [missingPaymentTypes, setMissingPaymentTypes] = useState([
-    { Id: 3, Name: "Bitcoin" },
-    { Id: 4, Name: "Paypal" },
-  ]);
+  const [clientPaymentTypes, setClientPaymentTypes] = useState([]);
+  const [missingPaymentTypes, setMissingPaymentTypes] = useState([]);
 
   useEffect(() => {
-    axios
-      .get("https://localhost:7115/api/payment-types", {
-        // withCredentials: true,
-        // credentials: "include", // "same-origin",
-        mode: "no-cors",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        cache: false,
-      })
+    httpRequest
+      .get(`https://localhost:${constants.PORT}/api/payment-types/GetAllPayments`, { clientId: "1" })
       .then((resp) => {
-        console.log(resp);
-      });
+        setClientPaymentTypes(resp);
+
+        httpRequest.get(`https://localhost:${constants.PORT}/api/payment-types`, {}).then((resp2) => {
+          setMissingPaymentTypes(resp2?.filter((pspType) => resp?.findIndex((clientType) => clientType.id === pspType.id) === -1));
+        });
+      })
+      .catch((err) => console.log(err));
   }, []);
 
-  const onDelete = () => {};
+  const onDelete = (data) => {
+    httpRequest
+      .delete(`https://localhost:${constants.PORT}/api/payment-types`, { id: data.id })
+      .then((resp) => {
+        setClientPaymentTypes(clientPaymentTypes.filter((type) => type.id !== data.id));
+        setMissingPaymentTypes([...missingPaymentTypes, { id: data.PaymentTypeId, Name: data.Name }]);
+      })
+      .catch((err) => console.log(err));
+  };
 
-  const onAdd = () => {};
+  const onAdd = (data) => {
+    const postData = {
+      paymentTypeId: data.id,
+      clientId: "1",
+      name: data.name,
+    };
+    httpRequest.post(`https://localhost:${constants.PORT}/api/payment-types`, postData).then((resp) => {
+      setClientPaymentTypes([...clientPaymentTypes, resp]);
+      setMissingPaymentTypes(missingPaymentTypes.filter((type) => type.id !== data.id));
+    });
+  };
 
   return (
     <div>
@@ -41,12 +50,12 @@ const PaymentTypes = (props) => {
         <CardTitle>Your Payment Types</CardTitle>
         <CardBody>
           <ListGroup>
-            {clientPaymentTypes.map((paymentType) => (
-              <ListGroupItem key={paymentType.Id} action tag="button">
+            {clientPaymentTypes?.map((paymentType) => (
+              <ListGroupItem key={paymentType.id} action>
                 <Button color="danger" style={{ marginBottom: "5px", marginLeft: "10px", marginRight: "10px" }} onClick={() => onDelete(paymentType)}>
                   Remove
                 </Button>
-                {paymentType.Name}
+                {paymentType.name}
               </ListGroupItem>
             ))}
           </ListGroup>
@@ -56,12 +65,12 @@ const PaymentTypes = (props) => {
         <CardTitle>Missing Payment Types</CardTitle>
         <CardBody>
           <ListGroup>
-            {missingPaymentTypes.map((paymentType) => (
-              <ListGroupItem key={paymentType.Id} action tag="button">
+            {missingPaymentTypes?.map((paymentType) => (
+              <ListGroupItem key={paymentType.id} action>
                 <Button color="primary" style={{ marginBottom: "5px", marginLeft: "10px", marginRight: "10px" }} onClick={() => onAdd(paymentType)}>
                   Add
                 </Button>
-                {paymentType.Name}
+                {paymentType.name}
               </ListGroupItem>
             ))}
           </ListGroup>

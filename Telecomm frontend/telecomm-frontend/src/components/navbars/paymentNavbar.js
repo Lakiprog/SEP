@@ -7,8 +7,8 @@ const PaymentNavbar = (props) => {
       <Nav>
         {props.paymentTypes?.map((paymentType) => (
           <NavItem>
-            <NavLink key={paymentType.Id} onClick={() => props.onSelected(paymentType)}>
-              {paymentType.Name}
+            <NavLink key={paymentType.id} onClick={() => props.onSelected(paymentType)}>
+              {paymentType.name}
             </NavLink>
           </NavItem>
         ))}

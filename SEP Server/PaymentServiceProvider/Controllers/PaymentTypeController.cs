@@ -23,7 +23,7 @@ namespace PaymentServiceProvider.Controllers
             return Ok(await _paymentTypeService.GetAllPaymentTypes());
         }
 
-        [HttpGet("{clientId}")]
+        [HttpGet("GetAllClientPayments")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PaymentType>))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
