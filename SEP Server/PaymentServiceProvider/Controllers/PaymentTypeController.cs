@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using PaymentServiceProvider.DTO;
 using PaymentServiceProvider.Interfaces;
 using PaymentServiceProvider.Models;
 
@@ -66,6 +67,44 @@ namespace PaymentServiceProvider.Controllers
             try
             {
                 bool isDeleted = await _paymentTypeService.RemovePaymentType(id);
+
+                if (!isDeleted)
+                    return NotFound(); // Return 404 if the item was not found
+
+                return NoContent(); // Return 204 No Content if successfully deleted
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("AddWebShopClientPaymentType")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(WebShopClientPaymentTypesDto))]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> AddWebShopClientPaymentType([FromBody] WebShopClientPaymentTypesDto webShopClientPaymentType)
+        {
+            try
+            {
+                var webShopClientPaymentTypes = await _paymentTypeService.AddWebShopClientPaymentType(webShopClientPaymentType);
+                return Ok(webShopClientPaymentTypes);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("RemoveWebShopClientPaymentType")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> RemoveWebShopClientPaymentType(int clientId, int paymentId)
+        {
+            try
+            {
+                bool isDeleted = await _paymentTypeService.RemoveWebShopClientPaymentType(clientId, paymentId);
 
                 if (!isDeleted)
                     return NotFound(); // Return 404 if the item was not found

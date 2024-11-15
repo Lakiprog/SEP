@@ -1,4 +1,5 @@
-﻿using PaymentServiceProvider.Models;
+﻿using PaymentServiceProvider.DTO;
+using PaymentServiceProvider.Models;
 
 namespace PaymentServiceProvider.Interfaces
 {
@@ -9,5 +10,7 @@ namespace PaymentServiceProvider.Interfaces
         Task<List<PaymentType>> GetAllPaymentTypesByClientId(int clientId);
         Task<List<PaymentType>> AddPaymentType(PaymentType paymentType);
         Task<bool> RemovePaymentType(int id);
+        Task<List<PaymentType>> AddWebShopClientPaymentType(WebShopClientPaymentTypesDto webShopClientPaymentType);
+        Task<bool> RemoveWebShopClientPaymentType(int clientId, int paymentId);
     }
 }

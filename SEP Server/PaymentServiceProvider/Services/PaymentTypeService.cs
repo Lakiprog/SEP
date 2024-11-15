@@ -1,4 +1,5 @@
-﻿using PaymentServiceProvider.Interfaces;
+﻿using PaymentServiceProvider.DTO;
+using PaymentServiceProvider.Interfaces;
 using PaymentServiceProvider.Models;
 using PaymentServiceProvider.Repository;
 
@@ -24,6 +25,11 @@ namespace PaymentServiceProvider.Services
 
             await _paymentTypeRepository.Add(paymentType);
             return await GetAllPaymentTypes();
+        }
+
+        public Task<List<PaymentType>> AddWebShopClientPaymentType(WebShopClientPaymentTypesDto webShopClientPaymentType)
+        {
+            throw new NotImplementedException();
         }
 
         public async Task<List<PaymentType>> GetAllPaymentTypes()
@@ -58,6 +64,11 @@ namespace PaymentServiceProvider.Services
             var deleted = await _paymentTypeRepository.Delete(id);
 
             return deleted == null ? false : true;
+        }
+
+        public Task<bool> RemoveWebShopClientPaymentType(int clientId, int paymentId)
+        {
+            throw new NotImplementedException();
         }
     }
 }
