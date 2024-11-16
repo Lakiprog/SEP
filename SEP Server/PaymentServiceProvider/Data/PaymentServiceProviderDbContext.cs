@@ -10,6 +10,7 @@ namespace PaymentServiceProvider.Data
         public DbSet<PaymentType> PaymentTypes { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<WebShopClient> WebShopClients { get; set; }
+        public DbSet<WebShopClientPaymentTypes> WebShopClientPaymentTypes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
