@@ -31,9 +31,11 @@ builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepositor
 builder.Services.AddScoped<IPaymentTypeRepository, PaymentTypeRepository>();
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.AddScoped<IWebShopClientRepository, WebShopClientRepository>();
+builder.Services.AddScoped<IWebShopClientPaymentTypesRepository, WebShopClientPaymentTypesRepository>();
 builder.Services.AddScoped<IPaymentTypeService, PaymentTypeService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IWebShopClientService, WebShopClientService>();
+
 
 var app = builder.Build();
 

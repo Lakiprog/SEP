@@ -7,5 +7,6 @@ namespace PaymentServiceProvider.Repository
     public class WebShopClientPaymentTypesRepository : GenericRepository<WebShopClientPaymentTypes>, IWebShopClientPaymentTypesRepository
     {
         public WebShopClientPaymentTypesRepository(PaymentServiceProviderDbContext context) : base(context) { }
+
     }
 }
