@@ -1,24 +1,27 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PaymentServiceProvider.Models;
 
-public class WebShopClientConfiguration : IEntityTypeConfiguration<WebShopClient>
+namespace PaymentServiceProvider.Data.Configuration
 {
-    public void Configure(EntityTypeBuilder<WebShopClient> builder)
+    public class WebShopClientConfiguration : IEntityTypeConfiguration<WebShopClient>
     {
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Id)
-            .ValueGeneratedOnAdd();
+        public void Configure(EntityTypeBuilder<WebShopClient> builder)
+        {
+            builder.HasKey(x => x.Id);
+            builder.Property(x => x.Id)
+                .ValueGeneratedOnAdd();
 
-        builder.HasMany(x => x.Transactions)
-            .WithOne(x => x.WebShopClient)
-            .HasForeignKey(x => x.WebShopClientId)
-            .OnDelete(DeleteBehavior.Cascade);
+            builder.HasMany(x => x.Transactions)
+                .WithOne(x => x.WebShopClient)
+                .HasForeignKey(x => x.WebShopClientId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasMany(x => x.PaymentTypes)
-            .WithMany() // No back reference in PaymentType
-            .UsingEntity<WebShopClientPaymentTypes>(
-                j => j.ToTable("WebShopClientPaymentTypes")
-            );
+            // Correctly configure the many-to-many relationship using the join table WebShopClientPaymentTypes
+            builder.HasMany(x => x.WebShopClientPaymentTypes)
+                .WithOne(x => x.WebShopClient)
+                .HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
     }
 }

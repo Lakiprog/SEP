@@ -41,7 +41,7 @@ namespace PaymentServiceProvider.Services
             if (paymentType == null)
                 throw new Exception($"Payment type with id {webShopClientPaymentType.PaymentTypeId} does not exist!");
 
-            if (webShopClient.PaymentTypes.Any(x => x.PaymentTypeId == webShopClientPaymentType.PaymentTypeId))
+            if (webShopClient.WebShopClientPaymentTypes.Any(x => x.PaymentTypeId == webShopClientPaymentType.PaymentTypeId))
                 throw new Exception($"WebShop Client with id {webShopClientPaymentType.ClientId} already has payment type {paymentType.Name}!");
 
             await _webShopClientPaymentTypesRepository.Add(new WebShopClientPaymentTypes { ClientId = webShopClient.Id, WebShopClient = webShopClient,
@@ -65,7 +65,7 @@ namespace PaymentServiceProvider.Services
             if (webShopClient == null)
                 throw new Exception($"WebShop Client with id {clientId} does not exist!");
 
-            List<WebShopClientPaymentTypes> paymentTypes = webShopClient.PaymentTypes;
+            List<WebShopClientPaymentTypes> paymentTypes = webShopClient.WebShopClientPaymentTypes;
             return paymentTypes;
         }
 
