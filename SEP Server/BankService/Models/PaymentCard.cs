@@ -2,7 +2,7 @@
 
 namespace BankService.Models
 {
-    public class CardInformation
+    public class PaymentCard
     {
         public int Id { get; set; }
         public string CardNumber { get; set; }

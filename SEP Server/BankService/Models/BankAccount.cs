@@ -11,6 +11,6 @@
         public RegularUser RegularUser { get; set; }
         public int MerchantId { get; set; }
         public Merchant Merchant { get; set; }
-        public List<CardInformation> Cards { get; set; }
+        public List<PaymentCard> PaymentCards { get; set; }
     }
 }

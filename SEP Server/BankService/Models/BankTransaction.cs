@@ -5,7 +5,11 @@
         public int Id { get; set; }
         public int PaymentId { get; set; }
         public DateTime MerchantTimeStamp { get; set; }
-        public int MerchantOrderId { get; set; }
+        public Guid MerchantOrderId { get; set; }
+        public Guid AcquirerOrderId { get; set; }
+        public DateTime AcquirerTimestamp { get; set; }
+        public Guid IssuerOrderId { get; set; }
+        public DateTime IssuerTimestamp { get; set; }
         public double Amount { get; set; }
         public string SuccessURL { get; set; }
         public string FailedURL { get; set; }
