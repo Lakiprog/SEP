@@ -12,8 +12,8 @@ using PaymentServiceProvider.Data;
 namespace PaymentServiceProvider.Migrations
 {
     [DbContext(typeof(PaymentServiceProviderDbContext))]
-    [Migration("20241112215446_RelationsPSP")]
-    partial class RelationsPSP
+    [Migration("20241202133706_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -37,12 +37,7 @@ namespace PaymentServiceProvider.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("WebShopClientId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("WebShopClientId");
 
                     b.ToTable("PaymentTypes");
                 });
@@ -58,8 +53,8 @@ namespace PaymentServiceProvider.Migrations
                     b.Property<double>("Amount")
                         .HasColumnType("float");
 
-                    b.Property<int>("MerchantOrderID")
-                        .HasColumnType("int");
+                    b.Property<Guid>("MerchantOrderID")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("MerchantTimestamp")
                         .HasColumnType("datetime2");
@@ -107,11 +102,27 @@ namespace PaymentServiceProvider.Migrations
                     b.ToTable("WebShopClients");
                 });
 
-            modelBuilder.Entity("PaymentServiceProvider.Models.PaymentType", b =>
+            modelBuilder.Entity("PaymentServiceProvider.Models.WebShopClientPaymentTypes", b =>
                 {
-                    b.HasOne("PaymentServiceProvider.Models.WebShopClient", null)
-                        .WithMany("PaymentTypes")
-                        .HasForeignKey("WebShopClientId");
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClientId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PaymentTypeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("PaymentTypeId");
+
+                    b.ToTable("WebShopClientPaymentTypes");
                 });
 
             modelBuilder.Entity("PaymentServiceProvider.Models.Transaction", b =>
@@ -125,11 +136,35 @@ namespace PaymentServiceProvider.Migrations
                     b.Navigation("WebShopClient");
                 });
 
+            modelBuilder.Entity("PaymentServiceProvider.Models.WebShopClientPaymentTypes", b =>
+                {
+                    b.HasOne("PaymentServiceProvider.Models.WebShopClient", "WebShopClient")
+                        .WithMany("WebShopClientPaymentTypes")
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PaymentServiceProvider.Models.PaymentType", "PaymentType")
+                        .WithMany("WebShopClientPaymentTypes")
+                        .HasForeignKey("PaymentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PaymentType");
+
+                    b.Navigation("WebShopClient");
+                });
+
+            modelBuilder.Entity("PaymentServiceProvider.Models.PaymentType", b =>
+                {
+                    b.Navigation("WebShopClientPaymentTypes");
+                });
+
             modelBuilder.Entity("PaymentServiceProvider.Models.WebShopClient", b =>
                 {
-                    b.Navigation("PaymentTypes");
-
                     b.Navigation("Transactions");
+
+                    b.Navigation("WebShopClientPaymentTypes");
                 });
 #pragma warning restore 612, 618
         }
