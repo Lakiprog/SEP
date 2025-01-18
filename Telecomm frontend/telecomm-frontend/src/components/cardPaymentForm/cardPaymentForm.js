@@ -16,7 +16,7 @@ const CardPaymentForm = (props) => {
   });
 
   const pay = (data) => {};
-
+  
   return (
     <div>
       <Card className="registration-form" style={{ backgroundColor: "#DEEDE6", borderColor: "black" }}>

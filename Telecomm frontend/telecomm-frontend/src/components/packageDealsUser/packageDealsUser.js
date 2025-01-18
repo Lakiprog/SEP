@@ -61,7 +61,7 @@ const PackageDealsUser = (props) => {
   };
 
   const onPaymentSelected = (paymentType) => {
-    switch (paymentType.Id) {
+    switch (paymentType.id) {
       case CreditCard:
         setSelectedPaymentType(paymentType);
         break;

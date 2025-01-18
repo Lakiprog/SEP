@@ -10,7 +10,7 @@ const PaymentContainer = (props) => {
   const Paypal = 4;
 
   const paymentForm = () => {
-    switch (props.paymentType.Id) {
+    switch (props.paymentType.id) {
       case CreditCard:
         return <CardPaymentForm onPay={props.onPay} paymentType={props.paymentType} />;
       case QR:
