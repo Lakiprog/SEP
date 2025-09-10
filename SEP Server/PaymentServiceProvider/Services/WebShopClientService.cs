@@ -28,9 +28,19 @@ namespace PaymentServiceProvider.Services
             return WebShopClients.ToList();
         }
 
-        public async Task<WebShopClient> GetWebShopClientById(int id)
+        public async Task<WebShopClient> GetById(int id)
         {
             return await _webShopClientRepository.Get(id);
+        }
+
+        public async Task<WebShopClient> GetByMerchantId(string merchantId)
+        {
+            return await _webShopClientRepository.GetByMerchantId(merchantId);
+        }
+
+        public async Task<WebShopClient> UpdateWebShopClient(WebShopClient webShopClient)
+        {
+            return await _webShopClientRepository.Update(webShopClient.Id, webShopClient);
         }
 
         public async Task<bool> RemoveWebShopClient(int id)

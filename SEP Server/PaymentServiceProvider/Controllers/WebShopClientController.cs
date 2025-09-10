@@ -24,7 +24,7 @@ namespace PaymentServiceProvider.Controllers
         {
             try
             {
-                var webShopClient = await _webShopClientService.GetWebShopClientById(id);
+                var webShopClient = await _webShopClientService.GetById(id);
                 return Ok(webShopClient);
             }
             catch (Exception ex)

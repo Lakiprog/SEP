@@ -13,5 +13,21 @@ namespace PaymentServiceProvider.Repository
         {
             return await _context.WebShopClients.FirstOrDefaultAsync(x => x.Name == webShopClientName);
         }
+
+        public async Task<WebShopClient> GetByIdWithPaymentTypes(int id)
+        {
+            return await _context.WebShopClients
+                .Include(w => w.WebShopClientPaymentTypes)
+                    .ThenInclude(wcpt => wcpt.PaymentType)
+                .FirstOrDefaultAsync(x => x.Id == id);
+        }
+
+        public async Task<WebShopClient> GetByMerchantId(string merchantId)
+        {
+            return await _context.WebShopClients
+                .Include(w => w.WebShopClientPaymentTypes)
+                    .ThenInclude(wcpt => wcpt.PaymentType)
+                .FirstOrDefaultAsync(x => x.MerchantId == merchantId);
+        }
     }
 }

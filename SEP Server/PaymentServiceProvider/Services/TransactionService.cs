@@ -62,5 +62,24 @@ namespace PaymentServiceProvider.Services
             List<Transaction> transactions = webShopClient.Transactions;
             return transactions;
         }
+
+        public async Task<List<Transaction>> GetTransactionsByClientId(int clientId, int page = 1, int pageSize = 10)
+        {
+            var allTransactions = await GetAllTransactionsByWebShopClientId(clientId);
+            return allTransactions
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+        }
+
+        public async Task<Transaction> GetByPSPTransactionId(string pspTransactionId)
+        {
+            return await _transactionRepository.GetByPSPTransactionId(pspTransactionId);
+        }
+
+        public async Task<Transaction> UpdateTransaction(Transaction transaction)
+        {
+            return await _transactionRepository.Update(transaction.Id, transaction);
+        }
     }
 }

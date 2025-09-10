@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PaymentServiceProvider.Data;
 
@@ -11,9 +12,11 @@ using PaymentServiceProvider.Data;
 namespace PaymentServiceProvider.Migrations
 {
     [DbContext(typeof(PaymentServiceProviderDbContext))]
-    partial class PaymentServiceProviderDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250828205850_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -30,28 +33,9 @@ namespace PaymentServiceProvider.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Configuration")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
@@ -66,27 +50,8 @@ namespace PaymentServiceProvider.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("CallbackURL")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CancelURL")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ExternalTransactionId")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<double>("Amount")
+                        .HasColumnType("float");
 
                     b.Property<Guid>("MerchantOrderID")
                         .HasColumnType("uniqueidentifier");
@@ -94,31 +59,14 @@ namespace PaymentServiceProvider.Migrations
                     b.Property<DateTime>("MerchantTimestamp")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("PSPTransactionId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PaymentData")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("PaymentTypeId")
-                        .HasColumnType("int");
-
                     b.Property<string>("ReturnURL")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<string>("StatusMessage")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("WebShopClientId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("PaymentTypeId");
 
                     b.HasIndex("WebShopClientId");
 
@@ -134,26 +82,8 @@ namespace PaymentServiceProvider.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("AccountNumber")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ApiKey")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("BaseUrl")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Configuration")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("LastActiveAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("MerchantId")
                         .IsRequired()
@@ -164,16 +94,6 @@ namespace PaymentServiceProvider.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("WebhookSecret")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -207,19 +127,11 @@ namespace PaymentServiceProvider.Migrations
 
             modelBuilder.Entity("PaymentServiceProvider.Models.Transaction", b =>
                 {
-                    b.HasOne("PaymentServiceProvider.Models.PaymentType", "PaymentType")
-                        .WithMany("Transactions")
-                        .HasForeignKey("PaymentTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("PaymentServiceProvider.Models.WebShopClient", "WebShopClient")
                         .WithMany("Transactions")
                         .HasForeignKey("WebShopClientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("PaymentType");
 
                     b.Navigation("WebShopClient");
                 });
@@ -245,8 +157,6 @@ namespace PaymentServiceProvider.Migrations
 
             modelBuilder.Entity("PaymentServiceProvider.Models.PaymentType", b =>
                 {
-                    b.Navigation("Transactions");
-
                     b.Navigation("WebShopClientPaymentTypes");
                 });
 

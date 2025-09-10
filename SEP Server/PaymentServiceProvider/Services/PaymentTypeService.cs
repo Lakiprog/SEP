@@ -60,18 +60,35 @@ namespace PaymentServiceProvider.Services
 
         public async Task<List<WebShopClientPaymentTypes>> GetAllPaymentTypesByClientId(int clientId)
         {
-            WebShopClient webShopClient = await _webShopClientRepository.Get(clientId);
+            WebShopClient webShopClient = await _webShopClientRepository.GetByIdWithPaymentTypes(clientId);
 
             if (webShopClient == null)
                 throw new Exception($"WebShop Client with id {clientId} does not exist!");
 
-            List<WebShopClientPaymentTypes> paymentTypes = webShopClient.WebShopClientPaymentTypes;
+            List<WebShopClientPaymentTypes> paymentTypes = webShopClient.WebShopClientPaymentTypes ?? new List<WebShopClientPaymentTypes>();
             return paymentTypes;
         }
 
         public async Task<PaymentType> GetPaymentType(string paymentTypeName)
         {
             return await _paymentTypeRepository.GetPaymentTypeByName(paymentTypeName);
+        }
+
+        public async Task<PaymentType> GetByType(string type)
+        {
+            var allPaymentTypes = await GetAllPaymentTypes();
+            return await Task.FromResult(allPaymentTypes.FirstOrDefault(pt => pt.Type == type));
+        }
+
+        public async Task<List<PaymentType>> GetPaymentTypesByClientId(int clientId)
+        {
+            var clientPaymentTypes = await GetAllPaymentTypesByClientId(clientId);
+            return clientPaymentTypes.Where(cpt => cpt.PaymentType != null).Select(cpt => cpt.PaymentType).ToList();
+        }
+
+        public async Task<PaymentType> UpdatePaymentType(PaymentType paymentType)
+        {
+            return await _paymentTypeRepository.Update(paymentType.Id, paymentType);
         }
 
         public async Task<bool> RemovePaymentType(int id)

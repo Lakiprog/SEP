@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PaymentServiceProvider.Data;
 
@@ -11,9 +12,11 @@ using PaymentServiceProvider.Data;
 namespace PaymentServiceProvider.Migrations
 {
     [DbContext(typeof(PaymentServiceProviderDbContext))]
-    partial class PaymentServiceProviderDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250910192701_FixNullableFields")]
+    partial class FixNullableFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -37,6 +40,7 @@ namespace PaymentServiceProvider.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsEnabled")
@@ -70,9 +74,11 @@ namespace PaymentServiceProvider.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("CallbackURL")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CancelURL")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("CompletedAt")
@@ -105,6 +111,7 @@ namespace PaymentServiceProvider.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("ReturnURL")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Status")
@@ -134,6 +141,7 @@ namespace PaymentServiceProvider.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("AccountNumber")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ApiKey")
@@ -141,6 +149,7 @@ namespace PaymentServiceProvider.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("BaseUrl")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Configuration")
@@ -150,6 +159,7 @@ namespace PaymentServiceProvider.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("LastActiveAt")

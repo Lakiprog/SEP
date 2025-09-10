@@ -6,8 +6,11 @@ namespace PaymentServiceProvider.Interfaces
     {
         Task<List<Transaction>> GetAllTransactions();
         Task<List<Transaction>> GetAllTransactionsByWebShopClientId(int webShopClientId);
+        Task<List<Transaction>> GetTransactionsByClientId(int clientId, int page = 1, int pageSize = 10);
         Task<Transaction> GetById(int id);
+        Task<Transaction> GetByPSPTransactionId(string pspTransactionId);
         Task<Transaction> AddTransaction(Transaction transaction);
+        Task<Transaction> UpdateTransaction(Transaction transaction);
         Task<bool> RemoveTransaction(int id);
     }
 }
