@@ -2,11 +2,12 @@
 {
     public class TransactionResponseDto
     {
-        public string PaymentCardNumber { get; set; }
-        public int AcquirerOrderId { get; set; }
+        public bool Success { get; set; }
+        public string AcquirerOrderId { get; set; } = string.Empty;
         public DateTime AcquirerTimestamp { get; set; }
-        public int IssuerOrderId { get; set; }
-        public DateTime IssuerTimestamp { get; set; }
-        public bool IsSuccessfull { get; set; }
+        public string? IssuerOrderId { get; set; }
+        public DateTime? IssuerTimestamp { get; set; }
+        public string? TransactionId { get; set; }
+        public string? ErrorMessage { get; set; }
     }
 }

@@ -2,13 +2,12 @@
 {
     public class TransactionRequestDto
     {
-        public string PaymentCardNumber { get; set; }
-        public string CardHolderFirstName { get; set; }
-        public string CardHolderLastName { get; set; }
+        public string PAN { get; set; } = string.Empty;
+        public string CardHolderName { get; set; } = string.Empty;
         public DateTime ExpirationDate { get; set; }
-        public string SecurityCode { get; set; }
-        public int AcquirerOrderId { get; set; }
+        public string SecurityCode { get; set; } = string.Empty;
+        public string AcquirerOrderId { get; set; } = string.Empty;
         public DateTime AcquirerTimestamp { get; set; }
-        public double Amount { get; set; }
+        public decimal Amount { get; set; }
     }
 }
