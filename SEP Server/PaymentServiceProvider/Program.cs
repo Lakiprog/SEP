@@ -97,19 +97,25 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Initialize PSP plugins and seed data
+Console.WriteLine("[DEBUG] Starting PSP initialization...");
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<PaymentServiceProviderDbContext>();
     var pluginManager = scope.ServiceProvider.GetRequiredService<IPaymentPluginManager>();
     
+    Console.WriteLine("[DEBUG] Services created, ensuring database...");
     // Ensure database is created
     context.Database.EnsureCreated();
     
+    Console.WriteLine("[DEBUG] Getting plugin services...");
     // Register payment plugins
     var plugins = scope.ServiceProvider.GetServices<IPaymentPlugin>();
+    Console.WriteLine($"[DEBUG] Found {plugins.Count()} plugins to register");
     foreach (var plugin in plugins)
     {
-        await pluginManager.RegisterPaymentPluginAsync(plugin);
+        Console.WriteLine($"[DEBUG] Registering plugin: {plugin.Name} (Type: {plugin.Type})");
+        var result = await pluginManager.RegisterPaymentPluginAsync(plugin);
+        Console.WriteLine($"[DEBUG] Plugin registration result: {result}");
     }
     
     // Seed payment types if they don't exist
@@ -180,6 +186,8 @@ using (var scope = app.Services.CreateScope())
         context.WebShopClientPaymentTypes.AddRange(clientPaymentTypes);
         context.SaveChanges();
     }
+    
+    Console.WriteLine("[DEBUG] PSP initialization completed successfully!");
 }
 
 app.Run();

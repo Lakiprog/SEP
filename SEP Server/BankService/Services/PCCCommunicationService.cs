@@ -1,6 +1,8 @@
 using BankService.Interfaces;
 using BankService.Models;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace BankService.Services

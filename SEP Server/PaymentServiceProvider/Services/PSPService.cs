@@ -152,6 +152,7 @@ namespace PaymentServiceProvider.Services
                 var paymentRequest = new PaymentRequest
                 {
                     MerchantId = transaction.WebShopClient.MerchantId,
+                    MerchantPassword = transaction.WebShopClient.MerchantPassword,
                     Amount = transaction.Amount,
                     Currency = transaction.Currency,
                     MerchantOrderID = transaction.MerchantOrderID,

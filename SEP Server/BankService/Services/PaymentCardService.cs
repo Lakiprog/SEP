@@ -26,7 +26,7 @@ namespace BankService.Services
 
                 if (string.IsNullOrEmpty(securityCode) || securityCode.Length < 3 || securityCode.Length > 4)
                 {
-                    return new CardValidationResult { IsValid = false, ErrorMessage = "Invalid security code" };
+                    return new CardValidationResult { IsValid = false, ErrorMessage = "Invalid security code: " + securityCode };
                 }
 
                 if (string.IsNullOrEmpty(cardHolderName))
@@ -55,7 +55,7 @@ namespace BankService.Services
                 // Validate security code
                 if (card.CVC != securityCode)
                 {
-                    return new CardValidationResult { IsValid = false, ErrorMessage = "Invalid security code" };
+                    return new CardValidationResult { IsValid = false, ErrorMessage = "Invalid security code: " + securityCode };
                 }
 
                 // Validate expiry date

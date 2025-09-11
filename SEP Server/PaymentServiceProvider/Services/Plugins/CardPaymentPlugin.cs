@@ -25,44 +25,56 @@ namespace PaymentServiceProvider.Services.Plugins
             try
             {
                 // Create bank payment request according to specification
-                var bankPaymentRequest = new BankPaymentRequest
+                var bankPaymentRequest = new
                 {
-                    MerchantId = request.MerchantId,
-                    MerchantPassword = request.MerchantPassword,
-                    Amount = request.Amount,
-                    MerchantOrderId = request.MerchantOrderID,
-                    MerchantTimestamp = DateTime.UtcNow,
-                    SuccessUrl = request.ReturnURL,
-                    FailedUrl = request.CancelURL,
-                    ErrorUrl = request.CancelURL
+                    MERCHANT_ID = request.MerchantId,
+                    MERCHANT_PASSWORD = request.MerchantPassword,
+                    AMOUNT = request.Amount,
+                    MERCHANT_ORDER_ID = request.MerchantOrderID,
+                    MERCHANT_TIMESTAMP = DateTime.UtcNow,
+                    SUCCESS_URL = request.ReturnURL,
+                    FAILED_URL = request.CancelURL,
+                    ERROR_URL = request.CancelURL
                 };
 
                 // Send request to BankService
                 var json = JsonSerializer.Serialize(bankPaymentRequest);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 
-                var response = await _httpClient.PostAsync($"{_bankServiceUrl}/api/bank/payment/initiate", content);
+                Console.WriteLine($"[DEBUG] Sending request to BankService: {_bankServiceUrl}/api/bank/payment");
+                Console.WriteLine($"[DEBUG] Request content: {json}");
+                
+                var response = await _httpClient.PostAsync($"{_bankServiceUrl}/api/bank/payment", content);
+                
+                Console.WriteLine($"[DEBUG] BankService response status: {response.StatusCode}");
+                Console.WriteLine($"[DEBUG] BankService response headers: {string.Join(", ", response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value)}"))}");
                 
                 if (!response.IsSuccessStatusCode)
                 {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[DEBUG] BankService error content: {errorContent}");
+                    
                     return new PaymentResponse
                     {
                         Success = false,
-                        Message = "Bank service unavailable",
+                        Message = $"Bank service unavailable: {response.StatusCode} - {errorContent}",
                         ErrorCode = "BANK_SERVICE_ERROR"
                     };
                 }
 
                 var responseContent = await response.Content.ReadAsStringAsync();
-                var bankResponse = JsonSerializer.Deserialize<BankPaymentResponse>(responseContent);
-
-                if (bankResponse?.Success == true)
+                Console.WriteLine($"[DEBUG] BankService response content: {responseContent}");
+                
+                // BankService returns different format than BankPaymentResponse
+                var bankResponse = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent);
+                
+                if (bankResponse != null && bankResponse.ContainsKey("paymenT_URL"))
                 {
                     return new PaymentResponse
                     {
                         Success = true,
                         Message = "Payment initiated successfully",
-                        PaymentUrl = bankResponse.PaymentUrl,
+                        PaymentUrl = bankResponse["paymenT_URL"]?.ToString(),
                         PSPTransactionId = transaction.PSPTransactionId
                     };
                 }
@@ -71,7 +83,7 @@ namespace PaymentServiceProvider.Services.Plugins
                     return new PaymentResponse
                     {
                         Success = false,
-                        Message = bankResponse?.Message ?? "Payment initiation failed",
+                        Message = "Payment initiation failed - invalid response format",
                         ErrorCode = "PAYMENT_INITIATION_FAILED"
                     };
                 }

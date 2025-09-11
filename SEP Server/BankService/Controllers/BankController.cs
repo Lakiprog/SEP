@@ -65,7 +65,9 @@ namespace BankService.Controllers
                     CreatedAt = DateTime.UtcNow,
                     SuccessUrl = request.SUCCESS_URL,
                     FailedUrl = request.FAILED_URL,
-                    ErrorUrl = request.ERROR_URL
+                    ErrorUrl = request.ERROR_URL,
+                    MerchantId = merchant.Id,
+                    RegularUserId = 1 // Use first RegularUser from seed data
                 };
 
                 await _bankTransactionRepository.AddAsync(transaction);

@@ -22,6 +22,14 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 
+// Add logging
+builder.Services.AddLogging();
+builder.Services.AddSingleton<ILogger<PCCCommunicationService>>(provider =>
+    provider.GetRequiredService<ILoggerFactory>().CreateLogger<PCCCommunicationService>());
+
+// Add configuration
+builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
+
 //Add Repository implementations
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IBankAccountRepository, BankAccountRepository>();
@@ -31,8 +39,9 @@ builder.Services.AddScoped<IPaymentCardRepository, PaymentCardRepository>();
 builder.Services.AddScoped<IRegularUserRepository, RegularUserRepository>();
 builder.Services.AddScoped<IPaymentCardService, PaymentCardService>();
 builder.Services.AddScoped<QRCodeService, QRCodeService>();
-builder.Services.AddScoped<IPCCCommunicationService, PCCCommunicationService>();
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<IPCCCommunicationService, PCCCommunicationService>();
+builder.Services.AddScoped<PCCCommunicationService>();
 
 var app = builder.Build();
 
@@ -58,6 +67,7 @@ using (var scope = app.Services.CreateScope())
         var merchant1 = new BankService.Models.Merchant
         {
             MerchantId = "MERCHANT001",
+            Merchant_Id = "MERCHANT001",
             MerchantPassword = "password123",
             MerchantName = "Test Merchant 1",
             BankId = 1
@@ -65,7 +75,8 @@ using (var scope = app.Services.CreateScope())
         
         var merchant2 = new BankService.Models.Merchant
         {
-            MerchantId = "MERCHANT002", 
+            MerchantId = "MERCHANT002",
+            Merchant_Id = "MERCHANT002", 
             MerchantPassword = "password123",
             MerchantName = "Test Merchant 2",
             BankId = 1
@@ -74,6 +85,7 @@ using (var scope = app.Services.CreateScope())
         var telecomMerchant = new BankService.Models.Merchant
         {
             MerchantId = "TELECOM_001",
+            Merchant_Id = "TELECOM_001",
             MerchantPassword = "telecom123",
             MerchantName = "Telecom Service",
             BankId = 1

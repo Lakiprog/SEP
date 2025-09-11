@@ -19,6 +19,55 @@ namespace PaymentServiceProvider.Controllers
         }
 
         /// <summary>
+        /// Debug endpoint to check registered plugins
+        /// </summary>
+        [HttpGet("debug/plugins")]
+        public async Task<IActionResult> GetRegisteredPlugins()
+        {
+            var plugins = await _pluginManager.GetAllPluginsAsync();
+            return Ok(new
+            {
+                PluginCount = plugins.Count,
+                Plugins = plugins.Select(p => new { Name = p.Name, Type = p.Type, IsEnabled = p.IsEnabled })
+            });
+        }
+
+        /// <summary>
+        /// Debug endpoint to manually register plugins
+        /// </summary>
+        [HttpPost("debug/register-plugins")]
+        public async Task<IActionResult> RegisterPlugins()
+        {
+            try
+            {
+                // Get all plugin services
+                var pluginServices = HttpContext.RequestServices.GetServices<IPaymentPlugin>();
+                var registeredCount = 0;
+                
+                foreach (var plugin in pluginServices)
+                {
+                    var result = await _pluginManager.RegisterPaymentPluginAsync(plugin);
+                    if (result) registeredCount++;
+                }
+                
+                var allPlugins = await _pluginManager.GetAllPluginsAsync();
+                
+                return Ok(new
+                {
+                    Message = "Plugin registration completed",
+                    ServicesFound = pluginServices.Count(),
+                    RegisteredCount = registeredCount,
+                    TotalPlugins = allPlugins.Count,
+                    Plugins = allPlugins.Select(p => new { Name = p.Name, Type = p.Type, IsEnabled = p.IsEnabled })
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = ex.Message, StackTrace = ex.StackTrace });
+            }
+        }
+
+        /// <summary>
         /// Create a new payment request
         /// </summary>
         [HttpPost("payment/create")]
