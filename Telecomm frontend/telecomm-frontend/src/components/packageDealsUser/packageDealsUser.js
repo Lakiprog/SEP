@@ -60,6 +60,7 @@ const PackageDealsUser = () => {
 
   const handlePaymentComplete = async (paymentResult) => {
     try {
+      console.log('Payment completed:', paymentResult);
       setSubscriptionLoading(true);
       
       // Create subscription
@@ -75,6 +76,8 @@ const PackageDealsUser = () => {
       
       if (response.data) {
         toast.success('Subscription created successfully!');
+        
+        // Close modal and reset state only after successful subscription creation
         setShowSubscriptionModal(false);
         setShowPaymentForm(false);
         setSelectedPaymentType(null);

@@ -19,6 +19,15 @@ namespace Telecom.Interfaces
         public string RedirectUrl { get; set; } = string.Empty;
         public string ErrorMessage { get; set; } = string.Empty;
         public PaymentStatus Status { get; set; }
+        
+        // QR Code specific properties
+        public string? QrCode { get; set; }
+        public decimal? Amount { get; set; }
+        public string? Currency { get; set; }
+        public string? AccountNumber { get; set; }
+        public string? ReceiverName { get; set; }
+        public string? OrderId { get; set; }
+        public string? Message { get; set; }
     }
 
     public class PaymentStatus

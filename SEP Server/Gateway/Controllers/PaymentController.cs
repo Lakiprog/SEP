@@ -95,6 +95,68 @@ namespace Gateway.Controllers
             }
         }
 
+        [HttpPost("packagedeal/payment/initiate")]
+        public async Task<IActionResult> InitiatePackagePayment([FromBody] PaymentInitiationRequest paymentRequest)
+        {
+            try
+            {
+                _logger.LogInformation($"Received payment request: {System.Text.Json.JsonSerializer.Serialize(paymentRequest)}");
+                
+                var client = _httpClientFactory.CreateClient();
+                
+                if (paymentRequest == null)
+                {
+                    return BadRequest(new { error = "Invalid payment request format" });
+                }
+                
+                _logger.LogInformation($"Parsed payment method: {paymentRequest.PaymentMethod}, amount: {paymentRequest.Amount}, currency: {paymentRequest.Currency}");
+                
+                // For QR payments, call Bank service directly
+                if (paymentRequest.PaymentMethod?.ToLower() == "qr")
+                {
+                    var qrData = new
+                    {
+                        Amount = paymentRequest.Amount,
+                        Currency = paymentRequest.Currency,
+                        MerchantId = "TELECOM_SRB",
+                        OrderId = Guid.NewGuid().ToString(),
+                        AccountNumber = "123456789012345678", // Should come from configuration
+                        ReceiverName = "Telekom Srbija"
+                    };
+
+                    _logger.LogInformation($"Calling Bank service with QR data: {System.Text.Json.JsonSerializer.Serialize(qrData)}");
+                    var response = await client.PostAsJsonAsync("http://localhost:7001/api/bank/qr-payment", qrData);
+                    _logger.LogInformation($"Bank service response status: {response.StatusCode}");
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var result = await response.Content.ReadFromJsonAsync<object>();
+                        _logger.LogInformation($"QR code generated successfully: {System.Text.Json.JsonSerializer.Serialize(result)}");
+                        return Ok(result);
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        _logger.LogError($"Bank service error: {response.StatusCode} - {errorContent}");
+                        return BadRequest(new { error = "Failed to generate QR code", details = errorContent });
+                    }
+                }
+                else
+                {
+                    // For other payment methods, return error - we only handle QR payments directly
+                    return BadRequest(new { 
+                        error = $"Payment method '{paymentRequest.PaymentMethod}' not supported directly. Use Telecom service for other payment methods.",
+                        success = false 
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error initiating payment");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
         [HttpPost("initiate")]
         public async Task<IActionResult> InitiatePayment([FromBody] PaymentRequest request)
         {
@@ -249,6 +311,31 @@ namespace Gateway.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+
+        [HttpPost("validate-qr")]
+        public async Task<IActionResult> ValidateQRCode([FromBody] QRValidationRequest request)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                var response = await client.PostAsJsonAsync("https://localhost:7001/api/bank/validate-qr", request);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<object>();
+                    return Ok(result);
+                }
+                else
+                {
+                    return BadRequest(new { error = "QR validation failed" });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating QR code");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
     }
 
     public class PaymentRequest
@@ -272,5 +359,21 @@ namespace Gateway.Controllers
         public string SecurityCode { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public string Description { get; set; } = string.Empty;
+    }
+
+    public class QRValidationRequest
+    {
+        public string QRCodeData { get; set; } = string.Empty;
+    }
+
+    public class PaymentInitiationRequest
+    {
+        public int SubscriptionId { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string Currency { get; set; } = "RSD";
+        public string Description { get; set; } = string.Empty;
+        public string ReturnUrl { get; set; } = string.Empty;
+        public string CancelUrl { get; set; } = string.Empty;
     }
 }

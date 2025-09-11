@@ -47,7 +47,7 @@ namespace Telecom.Services
                 };
 
                 var client = _httpClientFactory.CreateClient();
-                var response = await client.PostAsJsonAsync($"{gatewayUrl}/api/payment/initiate", gatewayRequest);
+                var response = await client.PostAsJsonAsync($"{gatewayUrl}/api/Payment/packagedeal/payment/initiate", request);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -60,6 +60,31 @@ namespace Telecom.Services
                         Status = "PENDING",
                         LastUpdated = DateTime.UtcNow
                     };
+
+                    // Return the gateway response directly for QR payments
+                    if (request.PaymentMethod.ToLower() == "qr")
+                    {
+                        // Convert gateway response to JsonElement for easier access
+                        var jsonResponse = System.Text.Json.JsonSerializer.Serialize(gatewayResponse);
+                        var jsonDoc = System.Text.Json.JsonDocument.Parse(jsonResponse);
+                        var root = jsonDoc.RootElement;
+
+                        return new PaymentResult
+                        {
+                            Success = root.GetProperty("success").GetBoolean(),
+                            PaymentId = paymentId,
+                            RedirectUrl = GetRedirectUrl(request.PaymentMethod, gatewayResponse),
+                            Status = _paymentStatuses[paymentId],
+                            // Copy QR code data from gateway response
+                            QrCode = root.TryGetProperty("qrCode", out var qrCode) ? qrCode.GetString() : null,
+                            Amount = root.TryGetProperty("amount", out var amount) ? amount.GetDecimal() : null,
+                            Currency = root.TryGetProperty("currency", out var currency) ? currency.GetString() : null,
+                            AccountNumber = root.TryGetProperty("accountNumber", out var account) ? account.GetString() : null,
+                            ReceiverName = root.TryGetProperty("receiverName", out var receiver) ? receiver.GetString() : null,
+                            OrderId = root.TryGetProperty("orderId", out var orderId) ? orderId.GetString() : null,
+                            Message = root.TryGetProperty("message", out var message) ? message.GetString() : null
+                        };
+                    }
 
                     return new PaymentResult
                     {
@@ -102,7 +127,7 @@ namespace Telecom.Services
                     
                     try
                     {
-                        var response = await client.GetAsync($"{gatewayUrl}/api/payment/status/{paymentId}");
+                        var response = await client.GetAsync($"{gatewayUrl}/api/Payment/status/{paymentId}");
                         if (response.IsSuccessStatusCode)
                         {
                             var gatewayStatus = await response.Content.ReadFromJsonAsync<object>();

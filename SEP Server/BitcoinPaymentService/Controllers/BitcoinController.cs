@@ -44,11 +44,11 @@ namespace BitcoinPaymentService.Controllers
 
                 return Ok(new
                 {
-                    payment_id = paymentId,
-                    bitcoin_address = bitcoinAddress,
-                    amount_btc = amountBtc,
+                    paymentId = paymentId,
+                    bitcoinAddress = bitcoinAddress,
+                    amountBtc = amountBtc,
                     status = "pending",
-                    qr_code = qrCode
+                    qrCode = qrCode
                 });
             }
             catch (Exception ex)

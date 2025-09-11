@@ -15,7 +15,7 @@ namespace BankService.Controllers
         private readonly IMerchantRepository _merchantRepository;
         private readonly IPaymentCardService _paymentCardService;
         private readonly QRCodeService _qrCodeService;
-        private readonly PCCCommunicationService _pccCommunicationService;
+        private readonly IPCCCommunicationService _pccCommunicationService;
         private readonly ILogger<BankController> _logger;
 
         public BankController(
@@ -25,7 +25,7 @@ namespace BankService.Controllers
             IMerchantRepository merchantRepository,
             IPaymentCardService paymentCardService,
             QRCodeService qrCodeService,
-            PCCCommunicationService pccCommunicationService,
+            IPCCCommunicationService pccCommunicationService,
             ILogger<BankController> logger)
         {
             _bankAccountRepository = bankAccountRepository;
@@ -86,36 +86,80 @@ namespace BankService.Controllers
         }
 
         [HttpPost("qr-payment")]
-        public IActionResult ProcessQRPayment([FromBody] QRPaymentRequest request)
+        public async Task<IActionResult> ProcessQRPayment([FromBody] QRPaymentRequest request)
         {
             try
             {
-                // Generate QR code data
-                var qrData = new
+                _logger.LogInformation($"Processing QR payment request for amount: {request.Amount} {request.Currency}");
+
+                // Generate QR code using IPS NBS specification
+                var qrCodeBase64 = _qrCodeService.GeneratePaymentQRCode(
+                    request.Amount,
+                    request.Currency,
+                    request.AccountNumber,
+                    request.ReceiverName,
+                    request.OrderId ?? Guid.NewGuid().ToString()
+                );
+
+                // Create payment transaction record
+                var paymentId = Guid.NewGuid().ToString();
+                
+                // Get the first merchant and user from database (or use specific ones)
+                var merchants = await _merchantRepository.GetAll();
+                var firstMerchant = merchants.FirstOrDefault();
+                
+                // For now, we'll use a simple approach - get the telecom merchant specifically
+                var telecomMerchant = merchants.FirstOrDefault(m => m.MerchantId == "TELECOM_001");
+                var merchantToUse = telecomMerchant ?? firstMerchant;
+                
+                if (merchantToUse == null)
                 {
+                    return BadRequest(new { 
+                        success = false,
+                        error = "No merchants found in database",
+                        message = "Greška: Nema dostupnih trgovaca u sistemu"
+                    });
+                }
+                
+                // For now, we'll use a default user ID (1) - this should be improved
+                // to get actual user from request or session
+                var transaction = new BankTransaction
+                {
+                    PaymentId = paymentId,
                     Amount = request.Amount,
-                    Currency = request.Currency,
-                    AccountNumber = request.AccountNumber,
-                    ReceiverName = request.ReceiverName,
-                    OrderId = request.OrderId
+                    Status = "PENDING",
+                    CreatedAt = DateTime.UtcNow,
+                    MerchantOrderId = request.OrderId ?? string.Empty,
+                    MerchantTimestamp = DateTime.UtcNow,
+                    AcquirerTimestamp = DateTime.UtcNow,
+                    IssuerTimestamp = DateTime.UtcNow,
+                    MerchantId = merchantToUse.Id,
+                    RegularUserId = 1 // This should be improved to get actual user
                 };
 
-                // Generate QR code (you would implement actual QR generation here)
-                var qrCodeBase64 = GenerateQRCode(qrData);
+                await _bankTransactionRepository.AddAsync(transaction);
 
                 return Ok(new
                 {
-                    QR_CODE = qrCodeBase64,
-                    AMOUNT = request.Amount,
-                    CURRENCY = request.Currency,
-                    ACCOUNT_NUMBER = request.AccountNumber,
-                    RECEIVER_NAME = request.ReceiverName
+                    success = true,
+                    paymentId = transaction.PaymentId,
+                    qrCode = qrCodeBase64,
+                    amount = request.Amount,
+                    currency = request.Currency,
+                    accountNumber = request.AccountNumber,
+                    receiverName = request.ReceiverName,
+                    orderId = request.OrderId,
+                    message = "QR kod je generisan uspešno. Skenirajte kod da biste završili plaćanje."
                 });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing QR payment");
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { 
+                    success = false,
+                    error = ex.Message,
+                    message = "Greška prilikom generisanja QR koda"
+                });
             }
         }
 
@@ -198,6 +242,36 @@ namespace BankService.Controllers
                 TransactionId = pccResponse?.TransactionId ?? Guid.NewGuid().ToString(),
                 Message = (pccResponse?.Success ?? false) ? "Transaction processed successfully" : (pccResponse?.ErrorMessage ?? "Unknown error")
             };
+        }
+
+        [HttpPost("validate-qr")]
+        public IActionResult ValidateQRCode([FromBody] QRValidationRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("Validating QR code");
+
+                var validationResult = _qrCodeService.ValidateQRCodeDetailed(request.QRCodeData);
+                
+                return Ok(new
+                {
+                    success = true,
+                    isValid = validationResult.IsValid,
+                    errors = validationResult.Errors,
+                    message = validationResult.IsValid ? 
+                        "QR kod je validan prema NBS IPS standardu" : 
+                        "QR kod nije validan prema NBS IPS standardu"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating QR code");
+                return BadRequest(new { 
+                    success = false,
+                    error = ex.Message,
+                    message = "Greška prilikom validacije QR koda"
+                });
+            }
         }
 
         private string GenerateQRCode(object qrData)
@@ -298,6 +372,11 @@ namespace BankService.Controllers
         public string OrderId { get; set; } = string.Empty;
         public string AccountNumber { get; set; } = string.Empty;
         public string ReceiverName { get; set; } = string.Empty;
+    }
+
+    public class QRValidationRequest
+    {
+        public string QRCodeData { get; set; } = string.Empty;
     }
 
     public class TransactionProcessingRequest
