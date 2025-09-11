@@ -125,7 +125,7 @@ namespace Gateway.Controllers
                     };
 
                     _logger.LogInformation($"Calling Bank service with QR data: {System.Text.Json.JsonSerializer.Serialize(qrData)}");
-                    var response = await client.PostAsJsonAsync("http://localhost:7001/api/bank/qr-payment", qrData);
+                    var response = await client.PostAsJsonAsync("https://localhost:7001/api/bank/qr-payment", qrData);
                     _logger.LogInformation($"Bank service response status: {response.StatusCode}");
                     
                     if (response.IsSuccessStatusCode)
