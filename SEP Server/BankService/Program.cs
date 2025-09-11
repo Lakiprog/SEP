@@ -85,17 +85,17 @@ using (var scope = app.Services.CreateScope())
         // Add sample regular users
         var user1 = new BankService.Models.RegularUser
         {
-            FirstName = "John",
-            LastName = "Doe",
-            Email = "john.doe@example.com",
+            FirstName = "Darie",
+            LastName = "Colak",
+            Email = "darie.colak@example.com",
             PhoneNumber = "+1234567890"
         };
         
         var user2 = new BankService.Models.RegularUser
         {
-            FirstName = "Jane",
-            LastName = "Smith", 
-            Email = "jane.smith@example.com",
+            FirstName = "Milos",
+            LastName = "Josipovic", 
+            Email = "milos.josp@example.com",
             PhoneNumber = "+1234567891"
         };
         
@@ -148,7 +148,7 @@ using (var scope = app.Services.CreateScope())
         var card1 = new BankService.Models.PaymentCard
         {
             CardNumber = "4111111111111111",
-            CardHolderName = "John Doe",
+            CardHolderName = "Darie Colak",
             ExpiryDate = "12/25",
             SecurityCode = "123",
             BankAccountId = account1.Id
@@ -157,7 +157,7 @@ using (var scope = app.Services.CreateScope())
         var card2 = new BankService.Models.PaymentCard
         {
             CardNumber = "5555555555554444",
-            CardHolderName = "Jane Smith",
+            CardHolderName = "Milos Josp",
             ExpiryDate = "06/26",
             SecurityCode = "456",
             BankAccountId = account2.Id

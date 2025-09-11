@@ -1,12 +1,11 @@
-﻿namespace Telecom.Models
+namespace Telecom.Models
 {
-    public class PaymentType
+    public class Category
     {
         public int Id { get; set; }
-        public string Type { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-        public bool IsEnabled { get; set; } = false;
+        public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
     }

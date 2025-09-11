@@ -1,13 +1,16 @@
 ﻿using Telecom.Models;
+using Telecom.DTO;
 
 namespace Telecom.Interfaces
 {
     public interface IPackageDealService
     {
-        Task<PackageDeal> CreatePackageDeal(PackageDeal packageDeal);
-        Task<PackageDeal> UpdatePackageDeal(PackageDeal packageDeal);
-        Task<PackageDeal> GetPackageDealById(int packageId);
-        Task<List<PackageDeal>> GetAllPackageDeals();
-        Task<bool> DeletePackageDealById(int packageId);
+        Task<IEnumerable<PackageDeal>> GetAllPackagesAsync();
+        Task<PackageDeal?> GetPackageByIdAsync(int id);
+        Task<PackageDeal> CreatePackageAsync(PackageDeal package);
+        Task<PackageDeal> UpdatePackageAsync(PackageDeal package);
+        Task DeletePackageAsync(int id);
+        Task<Subscription> SubscribeToPackageAsync(SubscriptionRequest request);
+        Task<IEnumerable<Subscription>> GetUserSubscriptionsAsync(int userId);
     }
 }
