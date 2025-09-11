@@ -1,82 +1,194 @@
 import React, { useEffect, useState } from "react";
-import { Button, Card, CardBody, CardTitle, ListGroup, ListGroupItem } from "reactstrap";
-import AdminNavbar from "../navbars/adminNavbar";
+import { Button, Card, CardBody, CardTitle, ListGroup, ListGroupItem, Container, Row, Col, Alert } from "reactstrap";
 import httpRequest from "../common/httpRequest";
 import * as constants from "../common/constants";
 
 const PaymentTypes = (props) => {
   const [clientPaymentTypes, setClientPaymentTypes] = useState([]);
   const [missingPaymentTypes, setMissingPaymentTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    httpRequest
-      .get(`https://localhost:${constants.PORT}/api/payment-types/GetAllPayments`, { clientId: "1" })
-      .then((resp) => {
-        setClientPaymentTypes(resp);
-
-        httpRequest.get(`https://localhost:${constants.PORT}/api/payment-types`, {}).then((resp2) => {
-          setMissingPaymentTypes(resp2?.filter((pspType) => resp?.findIndex((clientType) => clientType.id === pspType.id) === -1));
-        });
-      })
-      .catch((err) => console.log(err));
+    fetchPaymentTypes();
   }, []);
 
-  const onDelete = (data) => {
-    httpRequest
-      .delete(`https://localhost:${constants.PORT}/api/payment-types`, { id: data.id })
-      .then((resp) => {
-        setClientPaymentTypes(clientPaymentTypes.filter((type) => type.id !== data.id));
-        setMissingPaymentTypes([...missingPaymentTypes, { id: data.PaymentTypeId, Name: data.Name }]);
-      })
-      .catch((err) => console.log(err));
+  const fetchPaymentTypes = async () => {
+    try {
+      setLoading(true);
+      const resp = await httpRequest.get(`https://localhost:${constants.PORT}/api/payment-types/GetAllPayments`, { clientId: "1" });
+      setClientPaymentTypes(resp);
+
+      const resp2 = await httpRequest.get(`https://localhost:${constants.PORT}/api/payment-types`, {});
+      const missing = resp2?.filter((pspType) => resp?.findIndex((clientType) => clientType.id === pspType.id) === -1);
+      setMissingPaymentTypes(missing);
+    } catch (err) {
+      console.log(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const onAdd = (data) => {
-    const postData = {
-      paymentTypeId: data.id,
-      clientId: "1",
-      name: data.name,
-    };
-    httpRequest.post(`https://localhost:${constants.PORT}/api/payment-types`, postData).then((resp) => {
+  const onDelete = async (data) => {
+    try {
+      await httpRequest.delete(`https://localhost:${constants.PORT}/api/payment-types`, { id: data.id });
+      setClientPaymentTypes(clientPaymentTypes.filter((type) => type.id !== data.id));
+      setMissingPaymentTypes([...missingPaymentTypes, { id: data.PaymentTypeId, Name: data.Name }]);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const onAdd = async (data) => {
+    try {
+      const postData = {
+        paymentTypeId: data.id,
+        clientId: "1",
+        name: data.name,
+      };
+      const resp = await httpRequest.post(`https://localhost:${constants.PORT}/api/payment-types`, postData);
       setClientPaymentTypes([...clientPaymentTypes, resp]);
       setMissingPaymentTypes(missingPaymentTypes.filter((type) => type.id !== data.id));
-    });
+    } catch (err) {
+      console.log(err);
+    }
   };
 
+  const getPaymentIcon = (paymentType) => {
+    const name = paymentType.name?.toLowerCase() || paymentType.Name?.toLowerCase();
+    switch (name) {
+      case 'card':
+      case 'credit card':
+        return '💳';
+      case 'qr':
+      case 'qr code':
+        return '📱';
+      case 'paypal':
+        return '🌐';
+      case 'bitcoin':
+        return '₿';
+      default:
+        return '💳';
+    }
+  };
+
+  if (loading) {
+    return (
+      <Container className="mt-5">
+        <div className="text-center">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2">Loading payment types...</p>
+        </div>
+      </Container>
+    );
+  }
+
   return (
-    <div>
-      <AdminNavbar />
-      <Card className="registration-form" style={{ backgroundColor: "#DEEDE6", borderColor: "black" }}>
-        <CardTitle>Your Payment Types</CardTitle>
-        <CardBody>
-          <ListGroup>
-            {clientPaymentTypes?.map((paymentType) => (
-              <ListGroupItem key={paymentType.id} action>
-                <Button color="danger" style={{ marginBottom: "5px", marginLeft: "10px", marginRight: "10px" }} onClick={() => onDelete(paymentType)}>
-                  Remove
-                </Button>
-                {paymentType.name}
-              </ListGroupItem>
-            ))}
-          </ListGroup>
-        </CardBody>
-      </Card>
-      <Card className="registration-form" style={{ backgroundColor: "#DEEDE6", borderColor: "black" }}>
-        <CardTitle>Missing Payment Types</CardTitle>
-        <CardBody>
-          <ListGroup>
-            {missingPaymentTypes?.map((paymentType) => (
-              <ListGroupItem key={paymentType.id} action>
-                <Button color="primary" style={{ marginBottom: "5px", marginLeft: "10px", marginRight: "10px" }} onClick={() => onAdd(paymentType)}>
-                  Add
-                </Button>
-                {paymentType.name}
-              </ListGroupItem>
-            ))}
-          </ListGroup>
-        </CardBody>
-      </Card>
-    </div>
+    <Container className="mt-4">
+      <div className="text-center mb-5">
+        <h1 className="display-4 text-primary">
+          💳 Payment Types Management
+        </h1>
+        <p className="lead text-muted">
+          Manage your available payment methods
+        </p>
+      </div>
+
+      <Row className="g-4">
+        <Col md={6}>
+          <Card className="h-100 border-success">
+            <CardBody>
+              <CardTitle className="text-success">
+                <span className="me-2">✅</span>
+                Active Payment Types
+              </CardTitle>
+              {clientPaymentTypes?.length === 0 ? (
+                <Alert color="info">
+                  No payment types configured yet. Add some from the available options.
+                </Alert>
+              ) : (
+                <ListGroup>
+                  {clientPaymentTypes?.map((paymentType) => (
+                    <ListGroupItem key={paymentType.id} className="d-flex justify-content-between align-items-center">
+                      <div>
+                        <span className="me-2">{getPaymentIcon(paymentType)}</span>
+                        <strong>{paymentType.name}</strong>
+                      </div>
+                      <Button 
+                        color="danger" 
+                        size="sm"
+                        onClick={() => onDelete(paymentType)}
+                        title="Remove payment type"
+                      >
+                        🗑️ Remove
+                      </Button>
+                    </ListGroupItem>
+                  ))}
+                </ListGroup>
+              )}
+            </CardBody>
+          </Card>
+        </Col>
+
+        <Col md={6}>
+          <Card className="h-100 border-primary">
+            <CardBody>
+              <CardTitle className="text-primary">
+                <span className="me-2">➕</span>
+                Available Payment Types
+              </CardTitle>
+              {missingPaymentTypes?.length === 0 ? (
+                <Alert color="success">
+                  All available payment types are already configured!
+                </Alert>
+              ) : (
+                <ListGroup>
+                  {missingPaymentTypes?.map((paymentType) => (
+                    <ListGroupItem key={paymentType.id} className="d-flex justify-content-between align-items-center">
+                      <div>
+                        <span className="me-2">{getPaymentIcon(paymentType)}</span>
+                        <strong>{paymentType.name}</strong>
+                      </div>
+                      <Button 
+                        color="primary" 
+                        size="sm"
+                        onClick={() => onAdd(paymentType)}
+                        title="Add payment type"
+                      >
+                        ➕ Add
+                      </Button>
+                    </ListGroupItem>
+                  ))}
+                </ListGroup>
+              )}
+            </CardBody>
+          </Card>
+        </Col>
+      </Row>
+
+      <Row className="mt-4">
+        <Col>
+          <Card className="border-info">
+            <CardBody>
+              <h5 className="text-info">
+                <span className="me-2">ℹ️</span>
+                Payment Types Information
+              </h5>
+              <p className="mb-2">
+                <strong>Active Payment Types:</strong> These are the payment methods currently available to your customers.
+              </p>
+              <p className="mb-2">
+                <strong>Available Payment Types:</strong> These are additional payment methods you can enable for your customers.
+              </p>
+              <p className="mb-0">
+                <strong>Note:</strong> At least one payment type must remain active at all times.
+              </p>
+            </CardBody>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
   );
 };
 
