@@ -244,7 +244,7 @@ namespace Telecom.Services
                     Currency = request.Currency,
                     MerchantId = "TELECOM_SRB",
                     OrderId = paymentId,
-                    AccountNumber = "123456789012345678",
+                    AccountNumber = "105000000000099939",
                     ReceiverName = "Telekom Srbija"
                 };
 

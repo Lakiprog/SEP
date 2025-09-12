@@ -120,7 +120,7 @@ namespace Gateway.Controllers
                         Currency = paymentRequest.Currency,
                         MerchantId = "TELECOM_SRB",
                         OrderId = Guid.NewGuid().ToString(),
-                        AccountNumber = "123456789012345678", // Should come from configuration
+                        AccountNumber = "105000000000099939", // Should come from configuration
                         ReceiverName = "Telekom Srbija"
                     };
 
@@ -253,7 +253,7 @@ namespace Gateway.Controllers
                 Currency = "RSD",
                 MerchantId = request.MerchantId,
                 OrderId = request.MerchantOrderId,
-                AccountNumber = "123456789012345678", // Should come from configuration
+                AccountNumber = "105000000000099939", // Should come from configuration
                 ReceiverName = "Telekom Srbija"
             };
 
