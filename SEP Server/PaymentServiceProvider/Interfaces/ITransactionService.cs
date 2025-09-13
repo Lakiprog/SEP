@@ -12,5 +12,8 @@ namespace PaymentServiceProvider.Interfaces
         Task<Transaction> AddTransaction(Transaction transaction);
         Task<Transaction> UpdateTransaction(Transaction transaction);
         Task<bool> RemoveTransaction(int id);
+        
+        // New method for admin functionality
+        Task<List<Transaction>> GetAllAsync();
     }
 }

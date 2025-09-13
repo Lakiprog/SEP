@@ -114,5 +114,32 @@ namespace PaymentServiceProvider.Services
             var deleted = await _webShopClientPaymentTypesRepository.Delete(selected.Id);
             return deleted == null ? false : true;
         }
+
+        // New methods for admin functionality
+        public async Task<List<PaymentType>> GetAllAsync()
+        {
+            return await GetAllPaymentTypes();
+        }
+
+        public async Task<PaymentType> GetByIdAsync(int id)
+        {
+            return await _paymentTypeRepository.Get(id);
+        }
+
+        public async Task<PaymentType> CreateAsync(PaymentType paymentType)
+        {
+            var result = await AddPaymentType(paymentType);
+            return result.FirstOrDefault();
+        }
+
+        public async Task<PaymentType> UpdateAsync(PaymentType paymentType)
+        {
+            return await UpdatePaymentType(paymentType);
+        }
+
+        public async Task<bool> DeleteAsync(int id)
+        {
+            return await RemovePaymentType(id);
+        }
     }
 }

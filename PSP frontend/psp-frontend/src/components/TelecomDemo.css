@@ -1,0 +1,250 @@
+.telecom-demo {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.demo-container {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  padding: 40px;
+  width: 100%;
+  max-width: 500px;
+  animation: slideUp 0.6s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.demo-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.merchant-logo {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  color: white;
+  font-size: 32px;
+}
+
+.demo-header h1 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.demo-header p {
+  margin: 0;
+  color: #666;
+  font-size: 16px;
+}
+
+.demo-content {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.product-info {
+  text-align: center;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+}
+
+.product-info h2 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.price {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.currency {
+  color: #666;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.amount {
+  color: #333;
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.description {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.payment-form h3 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  color: #333;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.form-group input {
+  padding: 12px 16px;
+  border: 2px solid #e1e5e9;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #1e3c72;
+  box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
+}
+
+.pay-btn {
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: white;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.pay-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(30, 60, 114, 0.3);
+}
+
+.pay-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.demo-info {
+  padding: 20px;
+  background: #f0f4ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+}
+
+.demo-info h4 {
+  margin: 0 0 10px 0;
+  color: #1e3c72;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.demo-info p {
+  margin: 0 0 10px 0;
+  color: #4c51bf;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.demo-info p:last-of-type {
+  margin-bottom: 15px;
+}
+
+.demo-credentials {
+  background: white;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #a5b4fc;
+  color: #1e3c72;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .demo-container {
+    padding: 30px 20px;
+    margin: 10px;
+  }
+  
+  .demo-header h1 {
+    font-size: 24px;
+  }
+  
+  .merchant-logo {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+  }
+  
+  .amount {
+    font-size: 28px;
+  }
+  
+  .pay-btn {
+    font-size: 16px;
+    padding: 14px 20px;
+  }
+}

@@ -16,9 +16,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalhost", policy =>
     {
-        policy.WithOrigins("http://localhost:3000") // Allow your frontend to make requests
+        policy.WithOrigins("http://localhost:3000", "http://localhost:3001", "https://localhost:3000", "https://localhost:3001") // Allow your frontend to make requests
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials(); // Allow credentials for authenticated requests
     });
 });
 
@@ -88,9 +89,14 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// CORS must be before HTTPS redirection to handle preflight requests
 app.UseCors("AllowLocalhost");
 
 app.UseHttpsRedirection();
+
+// Serve static files for admin panel
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.UseAuthorization();
 

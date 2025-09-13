@@ -26,13 +26,4 @@ namespace PaymentServiceProvider.Models
         public List<PaymentMethod>? AvailablePaymentMethods { get; set; }
     }
 
-    public class PaymentMethod
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Type { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public string? IconUrl { get; set; }
-        public bool IsEnabled { get; set; }
-    }
 }

@@ -15,5 +15,12 @@ namespace PaymentServiceProvider.Interfaces
         Task<bool> RemovePaymentType(int id);
         Task<List<WebShopClientPaymentTypes>> AddWebShopClientPaymentType(WebShopClientPaymentTypesDto webShopClientPaymentType);
         Task<bool> RemoveWebShopClientPaymentType(int clientId, int paymentId);
+        
+        // New methods for admin functionality
+        Task<List<PaymentType>> GetAllAsync();
+        Task<PaymentType> GetByIdAsync(int id);
+        Task<PaymentType> CreateAsync(PaymentType paymentType);
+        Task<PaymentType> UpdateAsync(PaymentType paymentType);
+        Task<bool> DeleteAsync(int id);
     }
 }

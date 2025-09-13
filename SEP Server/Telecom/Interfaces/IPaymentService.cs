@@ -5,6 +5,7 @@ namespace Telecom.Interfaces
     public interface IPaymentService
     {
         Task<PaymentResult> InitiatePaymentAsync(PaymentInitiationRequest request);
+        Task<PaymentResult> InitiatePSPPaymentAsync(PSPPaymentInitiationRequest request);
         Task<PaymentStatus> GetPaymentStatusAsync(string paymentId);
         Task<PaymentResult> ProcessCardPaymentAsync(CardPaymentRequest request);
         Task<PaymentResult> ProcessQRPaymentAsync(QRPaymentRequest request);
@@ -17,8 +18,9 @@ namespace Telecom.Interfaces
         public bool Success { get; set; }
         public string PaymentId { get; set; } = string.Empty;
         public string RedirectUrl { get; set; } = string.Empty;
+        public string PaymentSelectionUrl { get; set; } = string.Empty;
         public string ErrorMessage { get; set; } = string.Empty;
-        public PaymentStatus Status { get; set; }
+        public PaymentStatus? Status { get; set; }
         
         // QR Code specific properties
         public string? QrCode { get; set; }

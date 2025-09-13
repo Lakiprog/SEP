@@ -69,10 +69,10 @@ namespace PaymentServiceProvider.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<string>("CallbackURL")
+                    b.Property<string>("CallbackUrl")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("CancelURL")
+                    b.Property<string>("CancelUrl")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("CompletedAt")
@@ -85,10 +85,19 @@ namespace PaymentServiceProvider.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("CustomerEmail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CustomerName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("ExternalTransactionId")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("MerchantOrderID")
+                    b.Property<Guid>("MerchantOrderId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("MerchantTimestamp")
@@ -101,10 +110,10 @@ namespace PaymentServiceProvider.Migrations
                     b.Property<string>("PaymentData")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("PaymentTypeId")
+                    b.Property<int?>("PaymentTypeId")
                         .HasColumnType("int");
 
-                    b.Property<string>("ReturnURL")
+                    b.Property<string>("ReturnUrl")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Status")
@@ -209,9 +218,7 @@ namespace PaymentServiceProvider.Migrations
                 {
                     b.HasOne("PaymentServiceProvider.Models.PaymentType", "PaymentType")
                         .WithMany("Transactions")
-                        .HasForeignKey("PaymentTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("PaymentTypeId");
 
                     b.HasOne("PaymentServiceProvider.Models.WebShopClient", "WebShopClient")
                         .WithMany("Transactions")

@@ -20,7 +20,7 @@ namespace PaymentServiceProvider.Services
             List<Transaction> allTransactions = await GetAllTransactions();
             Transaction? existingTransaction = allTransactions.Where(x => x.MerchantTimestamp == transaction.MerchantTimestamp)
                                                     .Where(x => x.WebShopClientId == transaction.WebShopClientId)
-                                                    .Where(x => x.MerchantOrderID == transaction.MerchantOrderID)
+                                                    .Where(x => x.MerchantOrderId == transaction.MerchantOrderId)
                                                     .Where(x => x.Amount == transaction.Amount)
                                                     .SingleOrDefault();
                          
@@ -80,6 +80,12 @@ namespace PaymentServiceProvider.Services
         public async Task<Transaction> UpdateTransaction(Transaction transaction)
         {
             return await _transactionRepository.Update(transaction.Id, transaction);
+        }
+
+        // New method for admin functionality
+        public async Task<List<Transaction>> GetAllAsync()
+        {
+            return await GetAllTransactions();
         }
     }
 }

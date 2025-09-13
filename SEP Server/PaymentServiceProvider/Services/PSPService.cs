@@ -71,12 +71,12 @@ namespace PaymentServiceProvider.Services
                     PaymentTypeId = cardPaymentType.Id,
                     Amount = request.Amount,
                     Currency = request.Currency,
-                    MerchantOrderID = request.MerchantOrderID,
+                    MerchantOrderId = request.MerchantOrderID,
                     MerchantTimestamp = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
-                    ReturnURL = request.ReturnURL,
-                    CancelURL = request.CancelURL,
-                    CallbackURL = request.CallbackURL,
+                    ReturnUrl = request.ReturnURL,
+                    CancelUrl = request.CancelURL,
+                    CallbackUrl = request.CallbackURL,
                     Status = TransactionStatus.Pending,
                     PSPTransactionId = GeneratePSPTransactionId(),
                     PaymentData = JsonSerializer.Serialize(request.CustomData ?? new Dictionary<string, object>())
@@ -155,10 +155,10 @@ namespace PaymentServiceProvider.Services
                     MerchantPassword = transaction.WebShopClient.MerchantPassword,
                     Amount = transaction.Amount,
                     Currency = transaction.Currency,
-                    MerchantOrderID = transaction.MerchantOrderID,
-                    ReturnURL = transaction.ReturnURL,
-                    CancelURL = transaction.CancelURL,
-                    CallbackURL = transaction.CallbackURL
+                    MerchantOrderID = transaction.MerchantOrderId,
+                    ReturnURL = transaction.ReturnUrl,
+                    CancelURL = transaction.CancelUrl,
+                    CallbackURL = transaction.CallbackUrl
                 };
 
                 // Process payment with plugin
