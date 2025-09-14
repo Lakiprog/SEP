@@ -190,33 +190,137 @@ namespace BankService.Controllers
         {
             try
             {
+                Console.WriteLine($"[DEBUG] Processing transaction for payment ID: {request.PAYMENT_ID}");
+                Console.WriteLine($"[DEBUG] Request data: PAN={request.PAN?.Substring(0, 4)}****, ExpiryDate={request.ExpiryDate}, Amount={request.Amount}");
+
+                // Validate request
+                if (string.IsNullOrEmpty(request.PAYMENT_ID))
+                {
+                    Console.WriteLine("[ERROR] PAYMENT_ID is empty");
+                    return BadRequest(new { error = "PAYMENT_ID is required" });
+                }
+
+                if (string.IsNullOrEmpty(request.PAN) || request.PAN.Length < 13)
+                {
+                    Console.WriteLine("[ERROR] Invalid PAN");
+                    return BadRequest(new { error = "Valid PAN is required" });
+                }
+
+                // Check if transaction exists
+                var transaction = await _bankTransactionRepository.GetByPaymentIdAsync(request.PAYMENT_ID);
+                if (transaction == null)
+                {
+                    Console.WriteLine($"[ERROR] Transaction not found for payment ID: {request.PAYMENT_ID}");
+                    return BadRequest(new { error = $"Transaction not found for payment ID: {request.PAYMENT_ID}" });
+                }
+
+                Console.WriteLine($"[DEBUG] Found transaction: {transaction.PaymentId}, Status: {transaction.Status}");
+
                 // Validate card data
                 var cardValidation = await _paymentCardService.ValidateCardAsync(
                     request.PAN, request.SecurityCode, request.CardHolderName, request.ExpiryDate);
 
                 if (!cardValidation.IsValid)
                 {
+                    Console.WriteLine($"[ERROR] Card validation failed: {cardValidation.ErrorMessage}");
                     return BadRequest(new { error = cardValidation.ErrorMessage });
                 }
 
-                // Process transaction through PCC if needed
-                var transactionResult = await ProcessTransactionThroughPCC(request);
+                // Check if card belongs to this bank
+                var card = await _paymentCardRepository.GetByPANAsync(request.PAN);
+                TransactionResult transactionResult;
 
-                // Update transaction status
-                var transaction = await _bankTransactionRepository.GetByPaymentIdAsync(request.PAYMENT_ID);
-                if (transaction != null)
+                if (card != null)
                 {
-                    transaction.Status = transactionResult.Success ? "SUCCESS" : "FAILED";
-                    transaction.ProcessedAt = DateTime.UtcNow;
-                    await _bankTransactionRepository.UpdateAsync(transaction);
+                    // Internal card - process within the same bank
+                    Console.WriteLine($"[DEBUG] Processing internal card transaction for PAN: {request.PAN.Substring(0, 4)}****");
+                    transactionResult = await ProcessInternalTransaction(request, card);
+                }
+                else
+                {
+                    // External card - process through PCC
+                    Console.WriteLine($"[DEBUG] Processing external card transaction through PCC for PAN: {request.PAN.Substring(0, 4)}****");
+                    transactionResult = await ProcessTransactionThroughPCC(request);
                 }
 
-                return Ok(transactionResult);
+                // Update transaction status (we already have the transaction from above)
+                transaction.Status = transactionResult.Success ? "SUCCESS" : "FAILED";
+                transaction.ProcessedAt = DateTime.UtcNow;
+                await _bankTransactionRepository.UpdateAsync(transaction);
+
+                Console.WriteLine($"[DEBUG] Transaction result: Success={transactionResult.Success}, Message={transactionResult.Message}");
+
+                return Ok(new { 
+                    success = transactionResult.Success,
+                    message = transactionResult.Message,
+                    transactionId = transactionResult.TransactionId
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing transaction");
                 return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        private async Task<TransactionResult> ProcessInternalTransaction(TransactionProcessingRequest request, PaymentCard card)
+        {
+            try
+            {
+                Console.WriteLine($"[DEBUG] Processing internal transaction for card ID: {card.Id}");
+                
+                // Get the bank account associated with this card
+                var bankAccount = await _bankAccountRepository.GetAccountByCardNumber(request.PAN);
+                if (bankAccount == null)
+                {
+                    Console.WriteLine($"[ERROR] Bank account not found for PAN: {request.PAN.Substring(0, 4)}****");
+                    return new TransactionResult
+                    {
+                        Success = false,
+                        TransactionId = Guid.NewGuid().ToString(),
+                        Message = "Bank account not found for this card"
+                    };
+                }
+
+                Console.WriteLine($"[DEBUG] Found bank account: {bankAccount.AccountNumber}, Balance: {bankAccount.Balance}");
+
+                // Check if account has sufficient funds
+                if (bankAccount.Balance < request.Amount)
+                {
+                    Console.WriteLine($"[ERROR] Insufficient funds. Required: {request.Amount}, Available: {bankAccount.Balance}");
+                    return new TransactionResult
+                    {
+                        Success = false,
+                        TransactionId = Guid.NewGuid().ToString(),
+                        Message = "Insufficient funds"
+                    };
+                }
+
+                // Deduct amount from account (simulate internal transfer)
+                bankAccount.Balance -= request.Amount;
+                
+                // Update the account in database
+                await _bankAccountRepository.UpdateAsync(bankAccount);
+
+                var transactionId = Guid.NewGuid().ToString();
+                Console.WriteLine($"[DEBUG] Internal transaction successful. Transaction ID: {transactionId}, New balance: {bankAccount.Balance}");
+
+                return new TransactionResult
+                {
+                    Success = true,
+                    TransactionId = transactionId,
+                    Message = "Internal transaction processed successfully"
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Error processing internal transaction: {ex.Message}");
+                return new TransactionResult
+                {
+                    Success = false,
+                    TransactionId = Guid.NewGuid().ToString(),
+                    Message = $"Internal transaction failed: {ex.Message}"
+                };
             }
         }
 

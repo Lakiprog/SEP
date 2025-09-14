@@ -19,6 +19,9 @@ export const bankAPI = {
   processTransaction: (data) => api.post('/bank/process-transaction', data),
   processQRTransaction: (data) => api.post('/bank/process-qr-transaction', data),
   getTransactionStatus: (paymentId) => api.get(`/bank/transaction-status/${paymentId}`),
+  
+  // Card payment processing
+  processCardPayment: (data) => api.post('/bank/process-transaction', data),
 };
 
 export default api;

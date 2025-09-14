@@ -53,7 +53,7 @@ namespace BankService.Services
                 }
 
                 // Validate security code
-                if (card.CVC != securityCode)
+                if (card.SecurityCode != securityCode)
                 {
                     return new CardValidationResult { IsValid = false, ErrorMessage = "Invalid security code: " + securityCode };
                 }
