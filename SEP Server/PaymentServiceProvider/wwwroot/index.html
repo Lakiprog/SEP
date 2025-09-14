@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSP Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: #e9ecef;
+        }
+
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .table th,
+        .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-suspended {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 2em;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .stat-card p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .payment-method-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .merchant-payment-methods {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .payment-method-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .payment-method-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .payment-method-card.selected {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>PSP Admin Panel</h1>
+            <p>Payment Service Provider Management System</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('dashboard')">Dashboard</button>
+            <button class="tab" onclick="showTab('merchants')">Merchants</button>
+            <button class="tab" onclick="showTab('payment-methods')">Payment Methods</button>
+            <button class="tab" onclick="showTab('transactions')">Transactions</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="section">
+                <h2>System Overview</h2>
+                <div class="stats-grid" id="statsGrid">
+                    <div class="loading">Loading statistics...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Merchants Tab -->
+        <div id="merchants" class="tab-content">
+            <div class="section">
+                <h2>Merchant Management</h2>
+                <button class="btn btn-success" onclick="showAddMerchantForm()">Add New Merchant</button>
+                
+                <div id="addMerchantForm" class="hidden">
+                    <h3>Add New Merchant</h3>
+                    <form id="merchantForm">
+                        <div class="form-group">
+                            <label for="merchantName">Merchant Name:</label>
+                            <input type="text" id="merchantName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="merchantDescription">Description:</label>
+                            <textarea id="merchantDescription" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="merchantAccountNumber">Account Number:</label>
+                            <input type="text" id="merchantAccountNumber">
+                        </div>
+                        <div class="form-group">
+                            <label for="merchantId">Merchant ID:</label>
+                            <input type="text" id="merchantId" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="merchantPassword">Merchant Password:</label>
+                            <input type="password" id="merchantPassword" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="merchantBaseUrl">Base URL:</label>
+                            <input type="url" id="merchantBaseUrl">
+                        </div>
+                        <button type="submit" class="btn btn-success">Create Merchant</button>
+                        <button type="button" class="btn btn-secondary" onclick="hideAddMerchantForm()">Cancel</button>
+                    </form>
+                </div>
+
+                <div id="merchantsList">
+                    <div class="loading">Loading merchants...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Methods Tab -->
+        <div id="payment-methods" class="tab-content">
+            <div class="section">
+                <h2>Payment Methods Management</h2>
+                <button class="btn btn-success" onclick="showAddPaymentMethodForm()">Add New Payment Method</button>
+                
+                <div id="addPaymentMethodForm" class="hidden">
+                    <h3>Add New Payment Method</h3>
+                    <form id="paymentMethodForm">
+                        <div class="form-group">
+                            <label for="paymentMethodName">Payment Method Name:</label>
+                            <input type="text" id="paymentMethodName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="paymentMethodType">Type:</label>
+                            <input type="text" id="paymentMethodType" required placeholder="e.g., payoneer, crypto, etc.">
+                        </div>
+                        <div class="form-group">
+                            <label for="paymentMethodDescription">Description:</label>
+                            <textarea id="paymentMethodDescription" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="paymentMethodEnabled">Enabled:</label>
+                            <select id="paymentMethodEnabled">
+                                <option value="true">Yes</option>
+                                <option value="false">No</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="paymentMethodConfiguration">Configuration (JSON):</label>
+                            <textarea id="paymentMethodConfiguration" rows="4" placeholder='{"apiKey": "your-api-key", "endpoint": "https://api.example.com"}'></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success">Create Payment Method</button>
+                        <button type="button" class="btn btn-secondary" onclick="hideAddPaymentMethodForm()">Cancel</button>
+                    </form>
+                </div>
+
+                <div id="paymentMethodsList">
+                    <div class="loading">Loading payment methods...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Tab -->
+        <div id="transactions" class="tab-content">
+            <div class="section">
+                <h2>Transaction History</h2>
+                <div id="transactionsList">
+                    <div class="loading">Loading transactions...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/admin';
+        
+        // Tab management
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+            
+            // Load data for the tab
+            switch(tabName) {
+                case 'dashboard':
+                    loadDashboard();
+                    break;
+                case 'merchants':
+                    loadMerchants();
+                    break;
+                case 'payment-methods':
+                    loadPaymentMethods();
+                    break;
+                case 'transactions':
+                    loadTransactions();
+                    break;
+            }
+        }
+
+        // Dashboard functions
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/statistics`);
+                const stats = await response.json();
+                
+                const statsGrid = document.getElementById('statsGrid');
+                statsGrid.innerHTML = `
+                    <div class="stat-card">
+                        <h3>${stats.totalMerchants}</h3>
+                        <p>Total Merchants</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${stats.activeMerchants}</h3>
+                        <p>Active Merchants</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${stats.totalPaymentMethods}</h3>
+                        <p>Payment Methods</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${stats.enabledPaymentMethods}</h3>
+                        <p>Enabled Methods</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${stats.totalTransactions}</h3>
+                        <p>Total Transactions</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${stats.completedTransactions}</h3>
+                        <p>Completed</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>$${stats.totalVolume.toFixed(2)}</h3>
+                        <p>Total Volume</p>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                document.getElementById('statsGrid').innerHTML = '<div class="alert alert-error">Error loading dashboard data</div>';
+            }
+        }
+
+        // Merchant functions
+        async function loadMerchants() {
+            try {
+                const response = await fetch(`${API_BASE}/merchants`);
+                const merchants = await response.json();
+                
+                const merchantsList = document.getElementById('merchantsList');
+                if (merchants.length === 0) {
+                    merchantsList.innerHTML = '<div class="alert alert-error">No merchants found</div>';
+                    return;
+                }
+                
+                let html = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Merchant ID</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                merchants.forEach(merchant => {
+                    const statusClass = merchant.status === 0 ? 'status-active' : 
+                                      merchant.status === 1 ? 'status-inactive' : 'status-suspended';
+                    const statusText = merchant.status === 0 ? 'Active' : 
+                                     merchant.status === 1 ? 'Inactive' : 'Suspended';
+                    
+                    html += `
+                        <tr>
+                            <td>${merchant.id}</td>
+                            <td>${merchant.name}</td>
+                            <td>${merchant.merchantId}</td>
+                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                            <td>${new Date(merchant.createdAt).toLocaleDateString()}</td>
+                            <td>
+                                <button class="btn btn-secondary" onclick="viewMerchant(${merchant.id})">View</button>
+                                <button class="btn btn-danger" onclick="deleteMerchant(${merchant.id})">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</tbody></table>';
+                merchantsList.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading merchants:', error);
+                document.getElementById('merchantsList').innerHTML = '<div class="alert alert-error">Error loading merchants</div>';
+            }
+        }
+
+        function showAddMerchantForm() {
+            document.getElementById('addMerchantForm').classList.remove('hidden');
+        }
+
+        function hideAddMerchantForm() {
+            document.getElementById('addMerchantForm').classList.add('hidden');
+            document.getElementById('merchantForm').reset();
+        }
+
+        document.getElementById('merchantForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const merchantData = {
+                name: document.getElementById('merchantName').value,
+                description: document.getElementById('merchantDescription').value,
+                accountNumber: document.getElementById('merchantAccountNumber').value,
+                merchantId: document.getElementById('merchantId').value,
+                merchantPassword: document.getElementById('merchantPassword').value,
+                baseUrl: document.getElementById('merchantBaseUrl').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/merchants`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(merchantData)
+                });
+                
+                if (response.ok) {
+                    showAlert('Merchant created successfully!', 'success');
+                    hideAddMerchantForm();
+                    loadMerchants();
+                } else {
+                    const error = await response.json();
+                    showAlert(`Error: ${error.message}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Payment Methods functions
+        async function loadPaymentMethods() {
+            try {
+                const response = await fetch(`${API_BASE}/payment-methods`);
+                const paymentMethods = await response.json();
+                
+                const paymentMethodsList = document.getElementById('paymentMethodsList');
+                if (paymentMethods.length === 0) {
+                    paymentMethodsList.innerHTML = '<div class="alert alert-error">No payment methods found</div>';
+                    return;
+                }
+                
+                let html = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Enabled</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                paymentMethods.forEach(method => {
+                    html += `
+                        <tr>
+                            <td>${method.id}</td>
+                            <td>${method.name}</td>
+                            <td>${method.type}</td>
+                            <td><span class="status-badge ${method.isEnabled ? 'status-active' : 'status-inactive'}">${method.isEnabled ? 'Yes' : 'No'}</span></td>
+                            <td>${new Date(method.createdAt).toLocaleDateString()}</td>
+                            <td>
+                                <button class="btn btn-secondary" onclick="viewPaymentMethod(${method.id})">View</button>
+                                <button class="btn btn-danger" onclick="deletePaymentMethod(${method.id})">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</tbody></table>';
+                paymentMethodsList.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading payment methods:', error);
+                document.getElementById('paymentMethodsList').innerHTML = '<div class="alert alert-error">Error loading payment methods</div>';
+            }
+        }
+
+        function showAddPaymentMethodForm() {
+            document.getElementById('addPaymentMethodForm').classList.remove('hidden');
+        }
+
+        function hideAddPaymentMethodForm() {
+            document.getElementById('addPaymentMethodForm').classList.add('hidden');
+            document.getElementById('paymentMethodForm').reset();
+        }
+
+        document.getElementById('paymentMethodForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const paymentMethodData = {
+                name: document.getElementById('paymentMethodName').value,
+                type: document.getElementById('paymentMethodType').value,
+                description: document.getElementById('paymentMethodDescription').value,
+                isEnabled: document.getElementById('paymentMethodEnabled').value === 'true',
+                configuration: document.getElementById('paymentMethodConfiguration').value || null
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/payment-methods`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(paymentMethodData)
+                });
+                
+                if (response.ok) {
+                    showAlert('Payment method created successfully!', 'success');
+                    hideAddPaymentMethodForm();
+                    loadPaymentMethods();
+                } else {
+                    const error = await response.json();
+                    showAlert(`Error: ${error.message}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Transactions functions
+        async function loadTransactions() {
+            try {
+                const response = await fetch(`${API_BASE}/transactions`);
+                const transactions = await response.json();
+                
+                const transactionsList = document.getElementById('transactionsList');
+                if (transactions.length === 0) {
+                    transactionsList.innerHTML = '<div class="alert alert-error">No transactions found</div>';
+                    return;
+                }
+                
+                let html = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>PSP Transaction ID</th>
+                                <th>Merchant</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                transactions.forEach(transaction => {
+                    const statusClass = transaction.status === 2 ? 'status-active' : 
+                                      transaction.status === 3 ? 'status-inactive' : 'status-suspended';
+                    const statusText = ['Pending', 'Processing', 'Completed', 'Failed', 'Cancelled', 'Refunded'][transaction.status];
+                    
+                    html += `
+                        <tr>
+                            <td>${transaction.id}</td>
+                            <td>${transaction.pspTransactionId}</td>
+                            <td>${transaction.webShopClient?.name || 'Unknown'}</td>
+                            <td>$${transaction.amount} ${transaction.currency}</td>
+                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                            <td>${new Date(transaction.createdAt).toLocaleDateString()}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</tbody></table>';
+                transactionsList.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                document.getElementById('transactionsList').innerHTML = '<div class="alert alert-error">Error loading transactions</div>';
+            }
+        }
+
+        // Utility functions
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            
+            const container = document.querySelector('.container');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        async function deleteMerchant(id) {
+            if (!confirm('Are you sure you want to delete this merchant?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/merchants/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showAlert('Merchant deleted successfully!', 'success');
+                    loadMerchants();
+                } else {
+                    showAlert('Error deleting merchant', 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function deletePaymentMethod(id) {
+            if (!confirm('Are you sure you want to delete this payment method?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/payment-methods/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showAlert('Payment method deleted successfully!', 'success');
+                    loadPaymentMethods();
+                } else {
+                    showAlert('Error deleting payment method', 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function viewMerchant(id) {
+            // TODO: Implement merchant details view
+            alert(`View merchant ${id} - Feature coming soon!`);
+        }
+
+        function viewPaymentMethod(id) {
+            // TODO: Implement payment method details view
+            alert(`View payment method ${id} - Feature coming soon!`);
+        }
+
+        // Initialize dashboard on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboard();
+        });
+    </script>
+</body>
+</html>

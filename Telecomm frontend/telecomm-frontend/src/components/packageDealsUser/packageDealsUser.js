@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, CardBody, CardTitle, CardText, Button, Modal, ModalHeader, ModalBody, ModalFooter, Form, FormGroup, Label, Input, Badge, TabContent, TabPane, Nav, NavItem, NavLink, Alert, Spinner } from 'reactstrap';
+import { Container, Row, Col, Card, CardBody, CardTitle, CardText, Button, Modal, ModalHeader, ModalBody, ModalFooter, FormGroup, Label, Input, Badge, TabContent, TabPane, Nav, NavItem, NavLink, Alert, Spinner } from 'reactstrap';
 import { toast } from 'react-toastify';
-import PaymentTypeSelector from '../paymentTypes/PaymentTypeSelector';
-import PaymentContainer from '../paymentContainer/paymentContainer';
 import axios from 'axios';
 
 const PackageDealsUser = () => {
@@ -13,8 +11,6 @@ const PackageDealsUser = () => {
   const [activeTab, setActiveTab] = useState('1');
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [selectedPaymentType, setSelectedPaymentType] = useState(null);
   const [years, setYears] = useState(1);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
@@ -49,60 +45,54 @@ const PackageDealsUser = () => {
   const handleSubscribe = (pkg) => {
     setSelectedPackage(pkg);
     setShowSubscriptionModal(true);
-    setShowPaymentForm(false);
-    setSelectedPaymentType(null);
   };
 
-  const handlePaymentTypeSelected = (paymentType) => {
-    setSelectedPaymentType(paymentType);
-    setShowPaymentForm(true);
-  };
-
-  const handlePaymentComplete = async (paymentResult) => {
+  const handlePayNow = async () => {
     try {
-      console.log('Payment completed:', paymentResult);
+      console.log('Pay Now button clicked!');
+      console.log('Selected package:', selectedPackage);
+      console.log('Years:', years);
+      
       setSubscriptionLoading(true);
       
-      // Create subscription
-      const subscriptionData = {
+      // Initiate payment through PSP
+      const paymentData = {
         userId: 1, // Mock user ID
         packageId: selectedPackage.id,
         years: years,
-        paymentMethod: paymentResult.paymentType,
-        subscriptionDate: new Date().toISOString()
+        amount: selectedPackage.price * years,
+        currency: 'USD',
+        description: `Subscription to ${selectedPackage.name} for ${years} year(s)`,
+        returnUrl: `${window.location.origin}/packageDealsUser?success=true`,
+        cancelUrl: `${window.location.origin}/packageDealsUser?cancelled=true`
       };
 
-      const response = await axios.post('https://localhost:7010/api/packagedeal/subscribe', subscriptionData);
+      console.log('Sending payment data:', paymentData);
+      console.log('API URL:', 'https://localhost:7010/api/packagedeal/payment/initiate-psp');
+
+      const response = await axios.post('https://localhost:7010/api/packagedeal/payment/initiate-psp', paymentData);
       
-      if (response.data) {
-        toast.success('Subscription created successfully!');
-        
-        // Close modal and reset state only after successful subscription creation
-        setShowSubscriptionModal(false);
-        setShowPaymentForm(false);
-        setSelectedPaymentType(null);
-        setSelectedPackage(null);
-        
-        // Refresh subscriptions
-        fetchSubscriptions();
+      console.log('Response received:', response.data);
+      
+      if (response.data && response.data.paymentSelectionUrl) {
+        console.log('Redirecting to:', response.data.paymentSelectionUrl);
+        // Redirect to PSP payment selection page
+        window.location.href = response.data.paymentSelectionUrl;
+      } else {
+        console.log('No payment selection URL in response');
+        toast.error('Failed to initiate payment. Please try again.');
       }
     } catch (err) {
-      console.error('Error creating subscription:', err);
-      toast.error('Failed to create subscription. Please try again.');
+      console.error('Error initiating payment:', err);
+      console.error('Error details:', err.response?.data);
+      toast.error(`Failed to initiate payment: ${err.message}`);
     } finally {
       setSubscriptionLoading(false);
     }
   };
 
-  const handleCancelPayment = () => {
-    setShowPaymentForm(false);
-    setSelectedPaymentType(null);
-  };
-
   const closeModal = () => {
     setShowSubscriptionModal(false);
-    setShowPaymentForm(false);
-    setSelectedPaymentType(null);
     setSelectedPackage(null);
     setYears(1);
   };
@@ -231,68 +221,72 @@ const PackageDealsUser = () => {
           Subscribe to {selectedPackage?.name}
         </ModalHeader>
         <ModalBody>
-          {!showPaymentForm ? (
-            <div>
-              <div className="mb-4 p-3 bg-light rounded">
-                <h6>📋 Package Details</h6>
-                <Row>
-                  <Col md="6">
-                    <strong>Package:</strong> {selectedPackage?.name}
-                  </Col>
-                  <Col md="6">
-                    <strong>Category:</strong> {selectedPackage?.category?.name}
-                  </Col>
-                </Row>
-                <Row className="mt-2">
-                  <Col md="6">
-                    <strong>Price per year:</strong> ${selectedPackage?.price}
-                  </Col>
-                  <Col md="6">
-                    <strong>Description:</strong> {selectedPackage?.description}
-                  </Col>
-                </Row>
-              </div>
-
-              <FormGroup>
-                <Label for="years">Subscription Duration (Years)</Label>
-                <Input
-                  id="years"
-                  type="select"
-                  value={years}
-                  onChange={(e) => setYears(parseInt(e.target.value))}
-                >
-                  <option value={1}>1 Year</option>
-                  <option value={2}>2 Years</option>
-                  <option value={3}>3 Years</option>
-                  <option value={5}>5 Years</option>
-                </Input>
-              </FormGroup>
-
-              <div className="mb-3 p-3 bg-primary text-white rounded">
-                <h6 className="mb-2">💰 Total Cost</h6>
-                <h4 className="mb-0">${selectedPackage ? selectedPackage.price * years : 0}</h4>
-                <small>${selectedPackage?.price} × {years} year(s)</small>
-              </div>
-
-              <PaymentTypeSelector
-                onPaymentSelected={handlePaymentTypeSelected}
-                availablePaymentTypes={[
-                  { id: 'card', name: 'Credit Card', icon: '💳', color: 'primary' },
-                  { id: 'qr', name: 'QR Code', icon: '📱', color: 'success' },
-                  { id: 'paypal', name: 'PayPal', icon: '🌐', color: 'info' },
-                  { id: 'bitcoin', name: 'Bitcoin', icon: '₿', color: 'warning' }
-                ]}
-              />
+          <div>
+            <div className="mb-4 p-3 bg-light rounded">
+              <h6>📋 Package Details</h6>
+              <Row>
+                <Col md="6">
+                  <strong>Package:</strong> {selectedPackage?.name}
+                </Col>
+                <Col md="6">
+                  <strong>Category:</strong> {selectedPackage?.category?.name}
+                </Col>
+              </Row>
+              <Row className="mt-2">
+                <Col md="6">
+                  <strong>Price per year:</strong> ${selectedPackage?.price}
+                </Col>
+                <Col md="6">
+                  <strong>Description:</strong> {selectedPackage?.description}
+                </Col>
+              </Row>
             </div>
-          ) : (
-            <PaymentContainer
-              selectedPaymentType={selectedPaymentType}
-              selectedPackage={selectedPackage}
-              years={years}
-              onPaymentComplete={handlePaymentComplete}
-              onCancel={handleCancelPayment}
-            />
-          )}
+
+            <FormGroup>
+              <Label for="years">Subscription Duration (Years)</Label>
+              <Input
+                id="years"
+                type="select"
+                value={years}
+                onChange={(e) => setYears(parseInt(e.target.value))}
+              >
+                <option value={1}>1 Year</option>
+                <option value={2}>2 Years</option>
+                <option value={3}>3 Years</option>
+                <option value={5}>5 Years</option>
+              </Input>
+            </FormGroup>
+
+            <div className="mb-3 p-3 bg-primary text-white rounded">
+              <h6 className="mb-2">💰 Total Cost</h6>
+              <h4 className="mb-0">${selectedPackage ? selectedPackage.price * years : 0}</h4>
+              <small>${selectedPackage?.price} × {years} year(s)</small>
+            </div>
+
+            <div className="text-center">
+              <Button
+                color="primary"
+                size="lg"
+                className="px-5 py-3"
+                onClick={handlePayNow}
+                disabled={subscriptionLoading}
+              >
+                {subscriptionLoading ? (
+                  <>
+                    <Spinner size="sm" className="me-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    💳 Pay Now
+                  </>
+                )}
+              </Button>
+              <p className="mt-2 text-muted small">
+                You'll be redirected to our secure payment page to complete your purchase
+              </p>
+            </div>
+          </div>
         </ModalBody>
         <ModalFooter>
           <Button color="secondary" onClick={closeModal}>

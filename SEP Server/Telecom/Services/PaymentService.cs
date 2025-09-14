@@ -115,6 +115,106 @@ namespace Telecom.Services
             }
         }
 
+        public async Task<PaymentResult> InitiatePSPPaymentAsync(PSPPaymentInitiationRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Initiating PSP payment for package {request.PackageId}, amount: {request.Amount}");
+
+                var pspUrl = _configuration["PSP:BaseUrl"] ?? "https://localhost:7006";
+                
+                // Create PSP payment initiation request
+                var pspRequest = new
+                {
+                    MerchantId = "TELECOM_001",
+                    MerchantPassword = "telecom123",
+                    Amount = request.Amount,
+                    Currency = request.Currency,
+                    MerchantOrderId = Guid.NewGuid(),
+                    Description = request.Description,
+                    CustomerEmail = $"user{request.UserId}@telecom.com", // Mock email
+                    CustomerName = $"User {request.UserId}", // Mock name
+                    ReturnUrl = request.ReturnUrl,
+                    CancelUrl = request.CancelUrl,
+                    CallbackUrl = $"{pspUrl}/api/payment/callback"
+                };
+
+                _logger.LogInformation($"Sending request to PSP: {pspUrl}/api/payment/initiate");
+                _logger.LogInformation($"Request data: {System.Text.Json.JsonSerializer.Serialize(pspRequest)}");
+
+                var client = _httpClientFactory.CreateClient();
+                var response = await client.PostAsJsonAsync($"{pspUrl}/api/payment/initiate", pspRequest);
+
+                _logger.LogInformation($"PSP Response Status: {response.StatusCode}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation($"PSP Response Content: {responseContent}");
+                    
+                    var pspResponse = await response.Content.ReadFromJsonAsync<object>();
+                    _logger.LogInformation($"PSP Response Object: {System.Text.Json.JsonSerializer.Serialize(pspResponse)}");
+                    
+                    // Extract payment selection URL from PSP response
+                    var jsonResponse = System.Text.Json.JsonSerializer.Serialize(pspResponse);
+                    var jsonDoc = System.Text.Json.JsonDocument.Parse(jsonResponse);
+                    var root = jsonDoc.RootElement;
+
+                    // Log all properties in the response
+                    _logger.LogInformation($"Response properties: {string.Join(", ", root.EnumerateObject().Select(p => $"{p.Name}={p.Value}"))}");
+
+                    var transactionId = root.TryGetProperty("TransactionId", out var txId) ? txId.GetString() : "";
+                    _logger.LogInformation($"Extracted TransactionId: '{transactionId}'");
+                    
+                    // Prefer URL provided by PSP backend (try both cases)
+                    var paymentSelectionUrl = root.TryGetProperty("PaymentSelectionUrl", out var selUrlEl) ? selUrlEl.GetString() : 
+                                             root.TryGetProperty("paymentSelectionUrl", out var selUrlEl2) ? selUrlEl2.GetString() : null;
+                    _logger.LogInformation($"Extracted PaymentSelectionUrl: '{paymentSelectionUrl}'");
+                    if (string.IsNullOrWhiteSpace(paymentSelectionUrl))
+                    {
+                        // Fallback: construct from PSP transaction id
+                        paymentSelectionUrl = string.IsNullOrWhiteSpace(transactionId)
+                            ? "http://localhost:3001/payment-selection" // last-resort (will show landing)
+                            : $"http://localhost:3001/payment-selection/{transactionId}";
+                    }
+                    
+                    _logger.LogInformation($"Transaction ID: {transactionId}, Payment Selection URL: {paymentSelectionUrl}");
+
+                    return new PaymentResult
+                    {
+                        Success = true,
+                        PaymentId = transactionId ?? "",
+                        PaymentSelectionUrl = paymentSelectionUrl,
+                        Status = new PaymentStatus
+                        {
+                            PaymentId = transactionId ?? "",
+                            Status = "PENDING",
+                            LastUpdated = DateTime.UtcNow
+                        }
+                    };
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError($"PSP payment initiation failed: {response.StatusCode} - {errorContent}");
+                    return new PaymentResult
+                    {
+                        Success = false,
+                        ErrorMessage = $"PSP payment initiation failed: {response.StatusCode} - {errorContent}"
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error initiating PSP payment");
+                return new PaymentResult
+                {
+                    Success = false,
+                    ErrorMessage = ex.Message
+                };
+            }
+        }
+
         public async Task<PaymentStatus> GetPaymentStatusAsync(string paymentId)
         {
             try

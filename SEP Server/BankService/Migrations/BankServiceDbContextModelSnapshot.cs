@@ -129,6 +129,9 @@ namespace BankService.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("StatusMessage")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("SuccessUrl")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");

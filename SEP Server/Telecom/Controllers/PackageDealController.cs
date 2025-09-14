@@ -151,6 +151,21 @@ namespace Telecom.Controllers
             }
         }
 
+        [HttpPost("payment/initiate-psp")]
+        public async Task<IActionResult> InitiatePSPPayment([FromBody] PSPPaymentInitiationRequest request)
+        {
+            try
+            {
+                var paymentResult = await _paymentService.InitiatePSPPaymentAsync(request);
+                return Ok(paymentResult);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error initiating PSP payment");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
         [HttpGet("payment/status/{paymentId}")]
         public async Task<IActionResult> GetPaymentStatus(string paymentId)
         {
