@@ -20,7 +20,16 @@ const CustomerPaymentSelection = () => {
     try {
       setLoading(true);
       const response = await customerPaymentAPI.getPaymentSelectionPage(transactionId);
-      setPaymentData(response.data);
+      console.log('🔍 Payment selection response:', response.data);
+      console.log('🔍 Available payment methods:', response.data.AvailablePaymentMethods || response.data.availablePaymentMethods);
+      
+      // Handle different case styles from backend
+      const paymentData = response.data;
+      if (paymentData.AvailablePaymentMethods && !paymentData.availablePaymentMethods) {
+        paymentData.availablePaymentMethods = paymentData.AvailablePaymentMethods;
+      }
+      
+      setPaymentData(paymentData);
     } catch (error) {
       console.error('Error loading payment selection:', error);
       toast.error('Failed to load payment options');
@@ -200,30 +209,37 @@ const CustomerPaymentSelection = () => {
       <div className="payment-methods">
         <h3>Choose Payment Method</h3>
         <div className="methods-grid">
-          {paymentData.availablePaymentMethods.map((method) => (
-            <div
-              key={method.type}
-              className={`method-card ${selectedPaymentMethod === method.type ? 'selected' : ''}`}
-              onClick={() => setSelectedPaymentMethod(method.type)}
-            >
-              <div className="method-icon">
-                {getPaymentMethodIcon(method.type)}
-              </div>
-              <div className="method-info">
-                <h4>{method.name}</h4>
-                <p>{getPaymentMethodDescription(method.type)}</p>
-              </div>
-              <div className="method-radio">
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value={method.type}
-                  checked={selectedPaymentMethod === method.type}
-                  onChange={() => setSelectedPaymentMethod(method.type)}
-                />
-              </div>
+          {(paymentData.availablePaymentMethods || []).length === 0 ? (
+            <div className="no-payment-methods">
+              <p>No payment methods available for this merchant.</p>
+              <p>Please contact the merchant or try again later.</p>
             </div>
-          ))}
+          ) : (
+            (paymentData.availablePaymentMethods || []).map((method) => (
+              <div
+                key={method.type}
+                className={`method-card ${selectedPaymentMethod === method.type ? 'selected' : ''}`}
+                onClick={() => setSelectedPaymentMethod(method.type)}
+              >
+                <div className="method-icon">
+                  {getPaymentMethodIcon(method.type)}
+                </div>
+                <div className="method-info">
+                  <h4>{method.name}</h4>
+                  <p>{getPaymentMethodDescription(method.type)}</p>
+                </div>
+                <div className="method-radio">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value={method.type}
+                    checked={selectedPaymentMethod === method.type}
+                    onChange={() => setSelectedPaymentMethod(method.type)}
+                  />
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

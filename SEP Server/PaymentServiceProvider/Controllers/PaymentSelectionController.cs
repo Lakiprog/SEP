@@ -228,20 +228,39 @@ namespace PaymentServiceProvider.Controllers
 
         private async Task<List<PaymentMethod>> GetAvailablePaymentMethodsForMerchant(int merchantId)
         {
+            Console.WriteLine($"[DEBUG] Getting payment methods for merchant ID: {merchantId}");
+            
             var merchant = await _clientService.GetByIdWithPaymentTypes(merchantId);
-            if (merchant?.WebShopClientPaymentTypes == null)
+            if (merchant == null)
+            {
+                Console.WriteLine($"[DEBUG] Merchant with ID {merchantId} not found");
                 return new List<PaymentMethod>();
+            }
+            
+            Console.WriteLine($"[DEBUG] Found merchant: {merchant.Name} (ID: {merchant.Id})");
+            
+            if (merchant.WebShopClientPaymentTypes == null)
+            {
+                Console.WriteLine($"[DEBUG] Merchant {merchant.Name} has no payment types configured");
+                return new List<PaymentMethod>();
+            }
+            
+            Console.WriteLine($"[DEBUG] Merchant {merchant.Name} has {merchant.WebShopClientPaymentTypes.Count} payment type configurations");
 
             var availableMethods = new List<PaymentMethod>();
 
             foreach (var clientPaymentType in merchant.WebShopClientPaymentTypes)
             {
+                Console.WriteLine($"[DEBUG] Processing payment type: {clientPaymentType.PaymentType?.Name} (Type: {clientPaymentType.PaymentType?.Type}, Enabled: {clientPaymentType.PaymentType?.IsEnabled})");
+                
                 if (clientPaymentType.PaymentType?.IsEnabled == true)
                 {
                     var plugin = await _pluginManager.GetPaymentPluginAsync(clientPaymentType.PaymentType.Type);
+                    Console.WriteLine($"[DEBUG] Plugin for {clientPaymentType.PaymentType.Type}: {plugin?.Name} (Enabled: {plugin?.IsEnabled})");
+                    
                     if (plugin != null && plugin.IsEnabled)
                     {
-                        availableMethods.Add(new PaymentMethod
+                        var paymentMethod = new PaymentMethod
                         {
                             Id = clientPaymentType.PaymentType.Id,
                             Name = clientPaymentType.PaymentType.Name,
@@ -249,11 +268,14 @@ namespace PaymentServiceProvider.Controllers
                             Description = clientPaymentType.PaymentType.Description ?? $"Payment via {clientPaymentType.PaymentType.Name}",
                             IconUrl = GetPaymentMethodIcon(clientPaymentType.PaymentType.Type),
                             IsEnabled = true
-                        });
+                        };
+                        availableMethods.Add(paymentMethod);
+                        Console.WriteLine($"[DEBUG] Added payment method: {paymentMethod.Name}");
                     }
                 }
             }
 
+            Console.WriteLine($"[DEBUG] Total available payment methods: {availableMethods.Count}");
             return availableMethods;
         }
 

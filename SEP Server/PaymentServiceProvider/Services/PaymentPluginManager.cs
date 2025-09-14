@@ -65,10 +65,21 @@ namespace PaymentServiceProvider.Services
 
         public async Task<IPaymentPlugin> GetPaymentPluginAsync(string paymentType)
         {
+            Console.WriteLine($"[DEBUG] GetPaymentPluginAsync called for type: {paymentType}");
+            
+            // Ensure plugins are initialized
+            await EnsurePluginsInitializedAsync();
+            
+            Console.WriteLine($"[DEBUG] Available plugins: {string.Join(", ", _plugins.Keys)}");
+            
             if (_plugins.ContainsKey(paymentType))
             {
-                return _plugins[paymentType];
+                var plugin = _plugins[paymentType];
+                Console.WriteLine($"[DEBUG] Found plugin for {paymentType}: {plugin.Name} (Enabled: {plugin.IsEnabled})");
+                return plugin;
             }
+            
+            Console.WriteLine($"[DEBUG] No plugin found for type: {paymentType}");
             return null;
         }
 
