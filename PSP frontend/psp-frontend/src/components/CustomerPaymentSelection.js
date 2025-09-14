@@ -50,20 +50,20 @@ const CustomerPaymentSelection = () => {
       return;
     }
 
-    // If QR payment is selected, show QR input
-    if (selectedPaymentMethod.toLowerCase() === 'qr') {
-      setShowQRInput(true);
-      return;
-    }
-
     try {
       setProcessing(true);
       const response = await customerPaymentAPI.selectPaymentMethod(transactionId, {
         paymentType: selectedPaymentMethod
       });
       
-      // Redirect to the payment service
-      if (response.data.redirectUrl) {
+      console.log('🔍 Payment method selection response:', response.data);
+      
+      // Redirect to the payment service (including QR payment)
+      if (response.data.paymentUrl) {
+        console.log('🔄 Redirecting to:', response.data.paymentUrl);
+        window.location.href = response.data.paymentUrl;
+      } else if (response.data.redirectUrl) {
+        console.log('🔄 Redirecting to:', response.data.redirectUrl);
         window.location.href = response.data.redirectUrl;
       } else {
         toast.success('Payment method selected successfully');
@@ -252,7 +252,7 @@ const CustomerPaymentSelection = () => {
               <textarea
                 value={qrCode}
                 onChange={(e) => setQrCode(e.target.value)}
-                placeholder="Paste QR code here (e.g., K:PR|V:01|C:1|R:105123456789121186|N:Telekom Srbija|I:RSD49,99|SF:221|RO:0069007399344596557495215)"
+                placeholder="Paste QR code here (e.g., K:PR|V:01|C:1|R:105000000000099939|N:Telekom Srbija|I:RSD49,99|SF:221|RO:0069007399344596557495215)"
                 rows="3"
                 className="qr-textarea"
               />

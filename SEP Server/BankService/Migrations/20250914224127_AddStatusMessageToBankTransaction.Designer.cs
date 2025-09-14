@@ -4,6 +4,7 @@ using BankService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BankService.Migrations
 {
     [DbContext(typeof(BankServiceDbContext))]
-    partial class BankServiceDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250914224127_AddStatusMessageToBankTransaction")]
+    partial class AddStatusMessageToBankTransaction
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

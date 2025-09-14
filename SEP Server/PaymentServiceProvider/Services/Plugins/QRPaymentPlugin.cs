@@ -14,16 +14,26 @@ namespace PaymentServiceProvider.Services.Plugins
         {
             try
             {
-                // QR payment is handled by the customer payment selection page
-                // This plugin just confirms that QR payment is available
+                // Generate redirect URL to bank React application QR payment page
+                // Pass transaction details as query parameters
+                var bankFrontendUrl = "http://localhost:3002"; // Bank React app URL
+                var bankQRUrl = $"{bankFrontendUrl}/qr-payment" +
+                    $"?amount={transaction.Amount}" +
+                    $"&currency=RSD" +
+                    $"&merchantId={request.MerchantId}" +
+                    $"&orderId={transaction.MerchantOrderId}" +
+                    $"&pspTransactionId={transaction.PSPTransactionId}" +
+                    $"&returnUrl={request.ReturnURL}" +
+                    $"&cancelUrl={request.CancelURL}";
                 
-                await Task.Delay(100); // Minimal delay for simulation
+                Console.WriteLine($"[DEBUG] QR Payment Plugin redirecting to: {bankQRUrl}");
                 
                 return new PaymentResponse
                 {
                     Success = true,
-                    Message = "QR payment method available",
-                    PaymentUrl = null // QR payment doesn't redirect immediately
+                    Message = "Redirecting to bank for QR payment",
+                    PaymentUrl = bankQRUrl,
+                    PSPTransactionId = transaction.PSPTransactionId
                 };
             }
             catch (Exception ex)

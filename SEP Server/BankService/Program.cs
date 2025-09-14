@@ -14,9 +14,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalhost", policy =>
     {
-        policy.WithOrigins("http://localhost:3000") // Allow your frontend to make requests
+        policy.WithOrigins(
+                "http://localhost:3001",  // PSP frontend
+                "http://localhost:3002"   // Bank frontend
+              )
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 

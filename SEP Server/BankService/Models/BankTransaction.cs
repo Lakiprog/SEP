@@ -12,6 +12,7 @@
         public DateTime IssuerTimestamp { get; set; }
         public decimal Amount { get; set; }
         public string Status { get; set; } = string.Empty;
+        public string? StatusMessage { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? ProcessedAt { get; set; }
         public string SuccessUrl { get; set; } = string.Empty;

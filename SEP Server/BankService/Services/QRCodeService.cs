@@ -455,7 +455,7 @@ namespace BankService.Services
             return GeneratePaymentQRCode(
                 amount: 49.99m,
                 currency: "RSD",
-                accountNumber: "105-1234567891211-86", // Biti će formatiran kao 18-cifreni string
+                accountNumber: "105-0000000000999-39", // Biti će formatiran kao 18-cifreni string
                 receiverName: "Telekom Srbija",
                 orderId: "69007399344596557495215",
                 purpose: "Telekom paket Premium"

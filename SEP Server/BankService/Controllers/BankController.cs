@@ -244,6 +244,149 @@ namespace BankService.Controllers
             };
         }
 
+        [HttpPost("process-qr-transaction")]
+        public async Task<IActionResult> ProcessQRTransaction([FromBody] QRTransactionRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Processing QR transaction for payment ID: {request.PaymentId}");
+
+                // Find the existing transaction first
+                var transaction = await _bankTransactionRepository.GetByPaymentIdAsync(request.PaymentId);
+                if (transaction == null)
+                {
+                    return BadRequest(new 
+                    { 
+                        success = false,
+                        message = "Transakcija nije pronađena" 
+                    });
+                }
+
+                // Generate or validate QR code
+                string qrCodeToProcess;
+                if (string.IsNullOrEmpty(request.QrCodeData))
+                {
+                    // Generate QR code automatically based on transaction data
+                    qrCodeToProcess = _qrCodeService.GeneratePaymentQRCode(
+                        request.Amount,
+                        request.Currency,
+                        "105000000000099939", // Telecom account
+                        "Telekom Srbija",
+                        transaction.PaymentId
+                    );
+                    _logger.LogInformation($"Auto-generated QR code for payment {request.PaymentId}");
+                }
+                else
+                {
+                    // Use provided QR code and validate it
+                    var validationResult = _qrCodeService.ValidateQRCodeDetailed(request.QrCodeData);
+                    if (!validationResult.IsValid)
+                    {
+                        return BadRequest(new 
+                        { 
+                            success = false,
+                            message = "QR kod nije validan prema NBS IPS standardu",
+                            errors = validationResult.Errors
+                        });
+                    }
+                    qrCodeToProcess = request.QrCodeData;
+                }
+
+                // Verify amounts match
+                if (Math.Abs(transaction.Amount - request.Amount) > 0.01m)
+                {
+                    return BadRequest(new 
+                    { 
+                        success = false,
+                        message = "Iznos u QR kodu ne odgovara iznosu transakcije" 
+                    });
+                }
+
+                // Simulate QR payment processing (in real implementation, this would interact with actual payment systems)
+                var random = new Random();
+                var isSuccess = random.NextDouble() > 0.1; // 90% success rate for demo
+
+                // Update transaction status
+                transaction.Status = isSuccess ? "SUCCESS" : "FAILED";
+                transaction.ProcessedAt = DateTime.UtcNow;
+                transaction.StatusMessage = isSuccess ? "QR plaćanje uspešno izvršeno" : "QR plaćanje neuspešno";
+                
+                await _bankTransactionRepository.UpdateAsync(transaction);
+
+                // Send callback to PSP if transaction is successful
+                if (isSuccess)
+                {
+                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(transaction.PaymentId, "SUCCESS"));
+                }
+
+                var result = new
+                {
+                    success = isSuccess,
+                    transactionId = transaction.PaymentId,
+                    message = transaction.StatusMessage,
+                    amount = transaction.Amount,
+                    currency = "RSD",
+                    timestamp = transaction.ProcessedAt
+                };
+
+                if (isSuccess)
+                {
+                    _logger.LogInformation($"QR transaction {transaction.PaymentId} processed successfully");
+                }
+                else
+                {
+                    _logger.LogWarning($"QR transaction {transaction.PaymentId} failed");
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing QR transaction");
+                return BadRequest(new 
+                { 
+                    success = false,
+                    message = "Greška prilikom obrade QR plaćanja",
+                    error = ex.Message 
+                });
+            }
+        }
+
+        private async Task NotifyPSPOfTransactionStatus(string paymentId, string status)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                var pspCallbackUrl = "https://localhost:7006/api/psp/callback"; // PSP callback endpoint
+                
+                var callbackData = new
+                {
+                    transactionId = paymentId,
+                    status = status,
+                    timestamp = DateTime.UtcNow,
+                    source = "BANK_QR_PAYMENT"
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(callbackData);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync(pspCallbackUrl, content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation($"Successfully notified PSP of transaction {paymentId} status: {status}");
+                }
+                else
+                {
+                    _logger.LogWarning($"Failed to notify PSP of transaction {paymentId} status. Response: {response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error notifying PSP of transaction {paymentId} status");
+            }
+        }
+
         [HttpPost("validate-qr")]
         public IActionResult ValidateQRCode([FromBody] QRValidationRequest request)
         {
@@ -525,5 +668,13 @@ namespace BankService.Controllers
         public string? Currency { get; set; }
         public string? ReceiverName { get; set; }
         public string? AccountNumber { get; set; }
+    }
+
+    public class QRTransactionRequest
+    {
+        public string PaymentId { get; set; } = string.Empty;
+        public string? QrCodeData { get; set; } // Optional, will be generated automatically if not provided
+        public decimal Amount { get; set; }
+        public string Currency { get; set; } = "RSD";
     }
 }
