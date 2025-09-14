@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { paymentSelectionAPI } from '../services/api';
+import { customerPaymentAPI } from '../services/api';
 import { toast } from 'react-toastify';
+import CustomerLayout from './CustomerLayout';
 import './CustomerPaymentSelection.css';
 
 const CustomerPaymentSelection = () => {
@@ -12,11 +13,13 @@ const CustomerPaymentSelection = () => {
   const [paymentData, setPaymentData] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [qrCode, setQrCode] = useState('');
+  const [showQRInput, setShowQRInput] = useState(false);
 
   const loadPaymentSelection = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await paymentSelectionAPI.getPaymentSelectionPage(transactionId);
+      const response = await customerPaymentAPI.getPaymentSelectionPage(transactionId);
       setPaymentData(response.data);
     } catch (error) {
       console.error('Error loading payment selection:', error);
@@ -38,9 +41,15 @@ const CustomerPaymentSelection = () => {
       return;
     }
 
+    // If QR payment is selected, show QR input
+    if (selectedPaymentMethod.toLowerCase() === 'qr') {
+      setShowQRInput(true);
+      return;
+    }
+
     try {
       setProcessing(true);
-      const response = await paymentSelectionAPI.selectPaymentMethod(transactionId, {
+      const response = await customerPaymentAPI.selectPaymentMethod(transactionId, {
         paymentType: selectedPaymentMethod
       });
       
@@ -54,6 +63,44 @@ const CustomerPaymentSelection = () => {
     } catch (error) {
       console.error('Error selecting payment method:', error);
       toast.error('Failed to select payment method');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleQRPayment = async () => {
+    if (!qrCode.trim()) {
+      toast.error('Please enter QR code');
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      const response = await customerPaymentAPI.processQRPayment(transactionId, {
+        qrCode: qrCode.trim()
+      });
+      
+      if (response.data.success) {
+        toast.success('QR payment processed successfully!');
+        
+        // Redirect to success page or return URL
+        if (response.data.redirectUrl) {
+          window.location.href = response.data.redirectUrl;
+        } else if (paymentData?.returnUrl) {
+          window.location.href = paymentData.returnUrl;
+        } else {
+          // Show success message
+          setTimeout(() => {
+            navigate('/');
+          }, 2000);
+        }
+      } else {
+        toast.error(response.data.message || 'QR payment failed');
+      }
+    } catch (error) {
+      console.error('Error processing QR payment:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to process QR payment';
+      toast.error(errorMessage);
     } finally {
       setProcessing(false);
     }
@@ -116,7 +163,8 @@ const CustomerPaymentSelection = () => {
   }
 
   return (
-    <div className="customer-payment-container">
+    <CustomerLayout>
+      <div className="customer-payment-container">
       <div className="payment-header">
         <div className="merchant-logo">
           <div className="logo-placeholder">🏪</div>
@@ -179,21 +227,57 @@ const CustomerPaymentSelection = () => {
         </div>
       </div>
 
-      <div className="payment-actions">
-        <button
-          className="btn btn-primary btn-large"
-          onClick={handlePaymentMethodSelect}
-          disabled={!selectedPaymentMethod || processing}
-        >
-          {processing ? 'Processing...' : 'Continue to Payment'}
-        </button>
-        <button
-          className="btn btn-secondary"
-          onClick={() => window.history.back()}
-        >
-          Cancel
-        </button>
-      </div>
+      {showQRInput ? (
+        <div className="qr-payment-section">
+          <div className="qr-input-card">
+            <h3>📱 QR Code Payment</h3>
+            <p>Enter the QR code from your banking app:</p>
+            <div className="qr-input-group">
+              <textarea
+                value={qrCode}
+                onChange={(e) => setQrCode(e.target.value)}
+                placeholder="Paste QR code here (e.g., K:PR|V:01|C:1|R:105123456789121186|N:Telekom Srbija|I:RSD49,99|SF:221|RO:0069007399344596557495215)"
+                rows="3"
+                className="qr-textarea"
+              />
+            </div>
+            <div className="qr-actions">
+              <button
+                className="btn btn-primary btn-large"
+                onClick={handleQRPayment}
+                disabled={!qrCode.trim() || processing}
+              >
+                {processing ? 'Processing QR Payment...' : 'Pay with QR Code'}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowQRInput(false);
+                  setQrCode('');
+                }}
+              >
+                Back to Payment Methods
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="payment-actions">
+          <button
+            className="btn btn-primary btn-large"
+            onClick={handlePaymentMethodSelect}
+            disabled={!selectedPaymentMethod || processing}
+          >
+            {processing ? 'Processing...' : 'Continue to Payment'}
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => window.history.back()}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       <div className="security-info">
         <div className="security-badge">
@@ -201,8 +285,9 @@ const CustomerPaymentSelection = () => {
           <span>Secure Payment</span>
         </div>
         <p>Your payment information is encrypted and secure.</p>
+        </div>
       </div>
-    </div>
+    </CustomerLayout>
   );
 };
 

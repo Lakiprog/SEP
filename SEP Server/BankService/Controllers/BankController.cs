@@ -274,6 +274,118 @@ namespace BankService.Controllers
             }
         }
 
+        [HttpPost("qr/validate")]
+        public IActionResult ValidateQRForPSP([FromBody] PSPQRValidationRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Validating QR code for PSP payment - Amount: {request.ExpectedAmount} {request.ExpectedCurrency}");
+
+                // Validate QR code format and structure
+                var validationResult = _qrCodeService.ValidateQRCodeDetailed(request.QRCode);
+                
+                if (!validationResult.IsValid)
+                {
+                    return Ok(new PSPQRValidationResponse
+                    {
+                        IsValid = false,
+                        ErrorMessage = "QR kod nije validan prema NBS IPS standardu",
+                        ParsedData = null
+                    });
+                }
+
+                // Parse QR code to extract payment information
+                var parsedData = _qrCodeService.ParseQRCode(request.QRCode);
+                
+                if (parsedData == null || !parsedData.ContainsKey("I"))
+                {
+                    return Ok(new PSPQRValidationResponse
+                    {
+                        IsValid = false,
+                        ErrorMessage = "QR kod ne sadrži validne podatke o plaćanju",
+                        ParsedData = null
+                    });
+                }
+
+                // Convert Dictionary<string, string> to Dictionary<string, object>
+                var parsedDataObject = parsedData.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
+
+                // Extract amount and currency from QR code
+                var amountString = parsedData["I"].ToString();
+                if (string.IsNullOrEmpty(amountString))
+                {
+                    return Ok(new PSPQRValidationResponse
+                    {
+                        IsValid = false,
+                        ErrorMessage = "QR kod ne sadrži informacije o iznosu",
+                        ParsedData = null
+                    });
+                }
+
+                // Parse amount (format: RSD49,99 or EUR25,50)
+                var amountMatch = System.Text.RegularExpressions.Regex.Match(amountString, @"^([A-Z]{3})(\d+),(\d+)$");
+                if (!amountMatch.Success)
+                {
+                    return Ok(new PSPQRValidationResponse
+                    {
+                        IsValid = false,
+                        ErrorMessage = "Neispravan format iznosa u QR kodu",
+                        ParsedData = null
+                    });
+                }
+
+                var qrCurrency = amountMatch.Groups[1].Value;
+                var qrAmountWhole = decimal.Parse(amountMatch.Groups[2].Value);
+                var qrAmountDecimal = decimal.Parse(amountMatch.Groups[3].Value) / 100;
+                var qrAmount = qrAmountWhole + qrAmountDecimal;
+
+                // Validate currency matches
+                if (qrCurrency != request.ExpectedCurrency)
+                {
+                    return Ok(new PSPQRValidationResponse
+                    {
+                        IsValid = false,
+                        ErrorMessage = $"Valuta u QR kodu ({qrCurrency}) se ne poklapa sa očekivanom valutom ({request.ExpectedCurrency})",
+                        ParsedData = parsedDataObject
+                    });
+                }
+
+                // Validate amount matches (allow small tolerance for rounding)
+                var amountDifference = Math.Abs(qrAmount - request.ExpectedAmount);
+                if (amountDifference > 0.01m)
+                {
+                    return Ok(new PSPQRValidationResponse
+                    {
+                        IsValid = false,
+                        ErrorMessage = $"Iznos u QR kodu ({qrAmount:F2}) se ne poklapa sa očekivanim iznosom ({request.ExpectedAmount:F2})",
+                        ParsedData = parsedDataObject
+                    });
+                }
+
+                // QR code is valid
+                return Ok(new PSPQRValidationResponse
+                {
+                    IsValid = true,
+                    ErrorMessage = null,
+                    ParsedData = parsedDataObject,
+                    Amount = qrAmount,
+                    Currency = qrCurrency,
+                    ReceiverName = parsedData.ContainsKey("N") ? parsedData["N"].ToString() : null,
+                    AccountNumber = parsedData.ContainsKey("R") ? parsedData["R"].ToString() : null
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating QR code for PSP");
+                return Ok(new PSPQRValidationResponse
+                {
+                    IsValid = false,
+                    ErrorMessage = $"Greška prilikom validacije QR koda: {ex.Message}",
+                    ParsedData = null
+                });
+            }
+        }
+
         private string GenerateQRCode(object qrData)
         {
             var qrString = System.Text.Json.JsonSerializer.Serialize(qrData);
@@ -394,5 +506,24 @@ namespace BankService.Controllers
         public bool Success { get; set; }
         public string TransactionId { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
+    }
+
+    public class PSPQRValidationRequest
+    {
+        public string QRCode { get; set; } = string.Empty;
+        public decimal ExpectedAmount { get; set; }
+        public string ExpectedCurrency { get; set; } = string.Empty;
+        public string? MerchantId { get; set; }
+    }
+
+    public class PSPQRValidationResponse
+    {
+        public bool IsValid { get; set; }
+        public string? ErrorMessage { get; set; }
+        public Dictionary<string, object>? ParsedData { get; set; }
+        public decimal? Amount { get; set; }
+        public string? Currency { get; set; }
+        public string? ReceiverName { get; set; }
+        public string? AccountNumber { get; set; }
     }
 }

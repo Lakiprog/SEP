@@ -164,7 +164,19 @@ namespace Telecom.Services
                     _logger.LogInformation($"Response properties: {string.Join(", ", root.EnumerateObject().Select(p => $"{p.Name}={p.Value}"))}");
 
                     var transactionId = root.TryGetProperty("TransactionId", out var txId) ? txId.GetString() : "";
-                    var paymentSelectionUrl = $"http://localhost:3001/payment-selection/{transactionId}";
+                    _logger.LogInformation($"Extracted TransactionId: '{transactionId}'");
+                    
+                    // Prefer URL provided by PSP backend (try both cases)
+                    var paymentSelectionUrl = root.TryGetProperty("PaymentSelectionUrl", out var selUrlEl) ? selUrlEl.GetString() : 
+                                             root.TryGetProperty("paymentSelectionUrl", out var selUrlEl2) ? selUrlEl2.GetString() : null;
+                    _logger.LogInformation($"Extracted PaymentSelectionUrl: '{paymentSelectionUrl}'");
+                    if (string.IsNullOrWhiteSpace(paymentSelectionUrl))
+                    {
+                        // Fallback: construct from PSP transaction id
+                        paymentSelectionUrl = string.IsNullOrWhiteSpace(transactionId)
+                            ? "http://localhost:3001/payment-selection" // last-resort (will show landing)
+                            : $"http://localhost:3001/payment-selection/{transactionId}";
+                    }
                     
                     _logger.LogInformation($"Transaction ID: {transactionId}, Payment Selection URL: {paymentSelectionUrl}");
 

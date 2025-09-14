@@ -87,4 +87,53 @@ namespace PaymentServiceProvider.Models
         public string IconUrl { get; set; } = string.Empty;
         public bool IsEnabled { get; set; }
     }
+
+    /// <summary>
+    /// Request for QR payment processing
+    /// </summary>
+    public class QRPaymentRequest
+    {
+        [Required]
+        public string QRCode { get; set; } = string.Empty;
+        public Dictionary<string, object>? AdditionalData { get; set; }
+    }
+
+    /// <summary>
+    /// Response for QR payment processing
+    /// </summary>
+    public class QRPaymentResponse
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string TransactionId { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string Currency { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string? RedirectUrl { get; set; }
+        public Dictionary<string, object>? AdditionalData { get; set; }
+    }
+
+    /// <summary>
+    /// QR validation result from BankService
+    /// </summary>
+    public class QRValidationResult
+    {
+        public bool IsValid { get; set; }
+        public string? ErrorMessage { get; set; }
+        public Dictionary<string, object>? ParsedData { get; set; }
+    }
+
+    /// <summary>
+    /// Bank service QR validation response
+    /// </summary>
+    public class BankQRValidationResponse
+    {
+        public bool IsValid { get; set; }
+        public string? ErrorMessage { get; set; }
+        public Dictionary<string, object>? ParsedData { get; set; }
+        public decimal? Amount { get; set; }
+        public string? Currency { get; set; }
+        public string? ReceiverName { get; set; }
+        public string? AccountNumber { get; set; }
+    }
 }

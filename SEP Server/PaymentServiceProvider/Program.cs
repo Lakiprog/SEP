@@ -70,6 +70,7 @@ builder.Services.AddScoped<IPaymentPluginManager, PaymentPluginManager>();
 builder.Services.AddScoped<IPaymentPlugin, CardPaymentPlugin>();
 builder.Services.AddScoped<IPaymentPlugin, PayPalPaymentPlugin>();
 builder.Services.AddScoped<IPaymentPlugin, BitcoinPaymentPlugin>();
+builder.Services.AddScoped<IPaymentPlugin, QRPaymentPlugin>();
 
 // Add HttpClient for bank communication
 builder.Services.AddHttpClient<CardPaymentPlugin>();
@@ -152,6 +153,15 @@ using (var scope = app.Services.CreateScope())
                 Name = "Bitcoin", 
                 Type = "bitcoin", 
                 Description = "Pay with Bitcoin cryptocurrency",
+                IsEnabled = true,
+                Configuration = "{}",
+                CreatedAt = DateTime.UtcNow
+            },
+            new PaymentServiceProvider.Models.PaymentType 
+            { 
+                Name = "QR Code Payment", 
+                Type = "qr", 
+                Description = "Pay with QR code scan",
                 IsEnabled = true,
                 Configuration = "{}",
                 CreatedAt = DateTime.UtcNow

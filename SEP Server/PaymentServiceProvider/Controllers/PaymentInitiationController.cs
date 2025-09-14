@@ -88,6 +88,7 @@ namespace PaymentServiceProvider.Controllers
                 }
 
                 // Create transaction record
+                var pspTransactionId = GeneratePSPTransactionId();
                 var transaction = new Transaction
                 {
                     WebShopClientId = merchant.Id,
@@ -97,6 +98,7 @@ namespace PaymentServiceProvider.Controllers
                     Description = request.Description,
                     CustomerEmail = request.CustomerEmail,
                     CustomerName = request.CustomerName,
+                    PSPTransactionId = pspTransactionId,
                     Status = TransactionStatus.Pending,
                     CreatedAt = DateTime.UtcNow,
                     ReturnUrl = request.ReturnUrl,
@@ -106,13 +108,14 @@ namespace PaymentServiceProvider.Controllers
 
                 var createdTransaction = await _transactionService.AddTransaction(transaction);
 
-                // Generate payment selection URL
-                var paymentSelectionUrl = $"{Request.Scheme}://{Request.Host}/payment-selection/{createdTransaction.Id}";
+                // Generate payment selection URL (customer-facing route on frontend)
+                var frontendBaseUrl = Environment.GetEnvironmentVariable("PSP_PUBLIC_FRONTEND_URL") ?? "http://localhost:3001";
+                var paymentSelectionUrl = $"{frontendBaseUrl}/payment-selection/{createdTransaction.PSPTransactionId}";
 
                 return Ok(new PaymentInitiationResponse
                 {
                     Success = true,
-                    TransactionId = createdTransaction.Id.ToString(),
+                    TransactionId = createdTransaction.PSPTransactionId,
                     PaymentSelectionUrl = paymentSelectionUrl,
                     AvailablePaymentMethods = availablePaymentMethods,
                     Message = "Payment initiated successfully"
@@ -128,6 +131,11 @@ namespace PaymentServiceProvider.Controllers
                     ErrorCode = "INTERNAL_ERROR"
                 });
             }
+        }
+
+        private string GeneratePSPTransactionId()
+        {
+            return $"PSP_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..8].ToUpper()}";
         }
 
         /// <summary>

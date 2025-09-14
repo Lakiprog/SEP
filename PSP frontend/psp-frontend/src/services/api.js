@@ -9,6 +9,14 @@ const api = axios.create({
   },
 });
 
+// Customer API instance (no authentication required)
+const customerApi = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
@@ -69,12 +77,20 @@ export const adminAPI = {
   getTransactions: () => api.get('/admin/transactions'),
 };
 
-// Payment Selection API endpoints
+// Payment Selection API endpoints (with authentication)
 export const paymentSelectionAPI = {
   getPaymentSelectionPage: (transactionId) => api.get(`/payment-selection/${transactionId}`),
   selectPaymentMethod: (transactionId, data) => api.post(`/payment-selection/${transactionId}/select`, data),
+  processQRPayment: (transactionId, data) => api.post(`/payment-selection/${transactionId}/qr-payment`, data),
   getMerchantPaymentMethods: (merchantId) => api.get(`/payment-selection/merchant/${merchantId}/payment-methods`),
   getPaymentMethodDetails: (paymentType) => api.get(`/payment-selection/payment-methods/${paymentType}`),
+};
+
+// Customer Payment Selection API endpoints (no authentication required)
+export const customerPaymentAPI = {
+  getPaymentSelectionPage: (transactionId) => customerApi.get(`/payment-selection/${transactionId}`),
+  selectPaymentMethod: (transactionId, data) => customerApi.post(`/payment-selection/${transactionId}/select`, data),
+  processQRPayment: (transactionId, data) => customerApi.post(`/payment-selection/${transactionId}/qr-payment`, data),
 };
 
 // PSP API endpoints

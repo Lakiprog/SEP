@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using PaymentServiceProvider.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using PaymentServiceProvider.Data;
 using PaymentServiceProvider.Models;
+using PaymentServiceProvider.Interfaces;
 
 namespace PaymentServiceProvider.Controllers
 {
@@ -8,433 +10,172 @@ namespace PaymentServiceProvider.Controllers
     [ApiController]
     public class AdminController : ControllerBase
     {
-        private readonly IWebShopClientService _clientService;
-        private readonly IPaymentTypeService _paymentTypeService;
-        private readonly ITransactionService _transactionService;
+        private readonly PaymentServiceProviderDbContext _context;
+        private readonly IPaymentPluginManager _pluginManager;
 
-        public AdminController(
-            IWebShopClientService clientService,
-            IPaymentTypeService paymentTypeService,
-            ITransactionService transactionService)
+        public AdminController(PaymentServiceProviderDbContext context, IPaymentPluginManager pluginManager)
         {
-            _clientService = clientService;
-            _paymentTypeService = paymentTypeService;
-            _transactionService = transactionService;
+            _context = context;
+            _pluginManager = pluginManager;
         }
 
-        #region Merchant Management
-
-        /// <summary>
-        /// Get all merchants
-        /// </summary>
-        [HttpGet("merchants")]
-        public async Task<IActionResult> GetMerchants()
+        [HttpPost("reseed")]
+        public async Task<IActionResult> ReseedData()
         {
             try
             {
-                var merchants = await _clientService.GetAllAsync();
-                return Ok(merchants);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
+                // Clear existing data
+                _context.WebShopClientPaymentTypes.RemoveRange(_context.WebShopClientPaymentTypes);
+                _context.PaymentTypes.RemoveRange(_context.PaymentTypes);
+                _context.WebShopClients.RemoveRange(_context.WebShopClients);
+                await _context.SaveChangesAsync();
 
-        /// <summary>
-        /// Get merchant by ID
-        /// </summary>
-        [HttpGet("merchants/{id}")]
-        public async Task<IActionResult> GetMerchant(int id)
-        {
-            try
-            {
-                var merchant = await _clientService.GetById(id);
-                if (merchant == null)
-                    return NotFound();
-
-                return Ok(merchant);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// Create new merchant
-        /// </summary>
-        [HttpPost("merchants")]
-        public async Task<IActionResult> CreateMerchant([FromBody] CreateMerchantRequest request)
-        {
-            try
-            {
-                var merchant = new WebShopClient
+                // Recreate payment types
+                var paymentTypes = new List<PaymentType>
                 {
-                    Name = request.Name,
-                    Description = request.Description,
-                    AccountNumber = request.AccountNumber,
-                    MerchantId = request.MerchantId,
-                    MerchantPassword = request.MerchantPassword,
-                    ApiKey = GenerateApiKey(),
-                    WebhookSecret = GenerateWebhookSecret(),
-                    BaseUrl = request.BaseUrl,
+                    new PaymentType 
+                    { 
+                        Name = "Credit/Debit Card", 
+                        Type = "card", 
+                        Description = "Pay with credit or debit card",
+                        IsEnabled = true,
+                        Configuration = "{}",
+                        CreatedAt = DateTime.UtcNow
+                    },
+                    new PaymentType 
+                    { 
+                        Name = "PayPal", 
+                        Type = "paypal", 
+                        Description = "Pay with PayPal account",
+                        IsEnabled = true,
+                        Configuration = "{}",
+                        CreatedAt = DateTime.UtcNow
+                    },
+                    new PaymentType 
+                    { 
+                        Name = "Bitcoin", 
+                        Type = "bitcoin", 
+                        Description = "Pay with Bitcoin cryptocurrency",
+                        IsEnabled = true,
+                        Configuration = "{}",
+                        CreatedAt = DateTime.UtcNow
+                    },
+                    new PaymentType 
+                    { 
+                        Name = "QR Code Payment", 
+                        Type = "qr", 
+                        Description = "Pay with QR code scan",
+                        IsEnabled = true,
+                        Configuration = "{}",
+                        CreatedAt = DateTime.UtcNow
+                    }
+                };
+                _context.PaymentTypes.AddRange(paymentTypes);
+                await _context.SaveChangesAsync();
+
+                // Recreate Telecom client
+                var telecomClient = new WebShopClient
+                {
+                    Name = "Telecom Operator",
+                    Description = "Telecommunications service provider",
+                    AccountNumber = "ACC001",
+                    MerchantId = "TELECOM_001",
+                    MerchantPassword = "telecom123",
+                    ApiKey = Guid.NewGuid().ToString(),
+                    WebhookSecret = Guid.NewGuid().ToString(),
+                    BaseUrl = "https://localhost:7006",
                     Status = ClientStatus.Active,
+                    Configuration = "{}",
                     CreatedAt = DateTime.UtcNow
                 };
+                _context.WebShopClients.Add(telecomClient);
+                await _context.SaveChangesAsync();
 
-                var createdMerchant = await _clientService.CreateAsync(merchant);
-                return CreatedAtAction(nameof(GetMerchant), new { id = createdMerchant.Id }, createdMerchant);
+                // Subscribe Telecom to all payment methods
+                var allPaymentTypes = _context.PaymentTypes.ToList();
+                var clientPaymentTypes = allPaymentTypes.Select(pt => new WebShopClientPaymentTypes
+                {
+                    ClientId = telecomClient.Id,
+                    PaymentTypeId = pt.Id
+                }).ToList();
+
+                _context.WebShopClientPaymentTypes.AddRange(clientPaymentTypes);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { 
+                    message = "Data reseeded successfully", 
+                    paymentTypes = allPaymentTypes.Count,
+                    client = telecomClient.Name,
+                    associations = clientPaymentTypes.Count
+                });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new { error = ex.Message });
             }
         }
 
-        /// <summary>
-        /// Update merchant
-        /// </summary>
-        [HttpPut("merchants/{id}")]
-        public async Task<IActionResult> UpdateMerchant(int id, [FromBody] UpdateMerchantRequest request)
-        {
-            try
-            {
-                var merchant = await _clientService.GetById(id);
-                if (merchant == null)
-                    return NotFound();
-
-                merchant.Name = request.Name;
-                merchant.Description = request.Description;
-                merchant.AccountNumber = request.AccountNumber;
-                merchant.BaseUrl = request.BaseUrl;
-                merchant.Status = request.Status;
-                merchant.UpdatedAt = DateTime.UtcNow;
-
-                await _clientService.UpdateAsync(merchant);
-                return Ok(merchant);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// Delete merchant
-        /// </summary>
-        [HttpDelete("merchants/{id}")]
-        public async Task<IActionResult> DeleteMerchant(int id)
-        {
-            try
-            {
-                var result = await _clientService.DeleteAsync(id);
-                if (!result)
-                    return NotFound();
-
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        #endregion
-
-        #region Payment Methods Management
-
-        /// <summary>
-        /// Get all payment methods
-        /// </summary>
         [HttpGet("payment-methods")]
-        public async Task<IActionResult> GetPaymentMethods()
+        public IActionResult GetPaymentMethods()
         {
-            try
-            {
-                var paymentMethods = await _paymentTypeService.GetAllAsync();
-                return Ok(paymentMethods);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var paymentTypes = _context.PaymentTypes.ToList();
+            return Ok(paymentTypes);
         }
 
-        /// <summary>
-        /// Create new payment method
-        /// </summary>
-        [HttpPost("payment-methods")]
-        public async Task<IActionResult> CreatePaymentMethod([FromBody] CreatePaymentMethodRequest request)
+        [HttpGet("clients")]
+        public IActionResult GetClients()
         {
-            try
-            {
-                var paymentMethod = new PaymentType
-                {
-                    Name = request.Name,
-                    Type = request.Type,
-                    Description = request.Description,
-                    IsEnabled = request.IsEnabled,
-                    Configuration = request.Configuration,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                var createdPaymentMethod = await _paymentTypeService.CreateAsync(paymentMethod);
-                return CreatedAtAction(nameof(GetPaymentMethod), new { id = createdPaymentMethod.Id }, createdPaymentMethod);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var clients = _context.WebShopClients
+                .Select(c => new { c.Id, c.Name, c.MerchantId, c.Status })
+                .ToList();
+            return Ok(clients);
         }
 
-        /// <summary>
-        /// Get payment method by ID
-        /// </summary>
-        [HttpGet("payment-methods/{id}")]
-        public async Task<IActionResult> GetPaymentMethod(int id)
+        [HttpGet("debug/client-payment-methods/{clientId}")]
+        public async Task<IActionResult> DebugGetClientPaymentMethods(int clientId)
         {
-            try
-            {
-                var paymentMethod = await _paymentTypeService.GetByIdAsync(id);
-                if (paymentMethod == null)
-                    return NotFound();
+            var merchant = await _context.WebShopClients
+                .Include(w => w.WebShopClientPaymentTypes)
+                    .ThenInclude(wcpt => wcpt.PaymentType)
+                .FirstOrDefaultAsync(x => x.Id == clientId);
 
-                return Ok(paymentMethod);
-            }
-            catch (Exception ex)
+            if (merchant == null)
+                return NotFound($"Client {clientId} not found");
+
+            var paymentMethods = merchant.WebShopClientPaymentTypes?.Select(wcpt => new
             {
-                return BadRequest(new { message = ex.Message });
-            }
+                PaymentTypeId = wcpt.PaymentTypeId,
+                PaymentTypeName = wcpt.PaymentType?.Name,
+                PaymentTypeType = wcpt.PaymentType?.Type,
+                IsEnabled = wcpt.PaymentType?.IsEnabled
+            }).ToList();
+
+            var result = new
+            {
+                merchant.Id,
+                merchant.Name,
+                merchant.MerchantId,
+                PaymentMethods = paymentMethods ?? new()
+            };
+
+            return Ok(result);
         }
 
-        /// <summary>
-        /// Update payment method
-        /// </summary>
-        [HttpPut("payment-methods/{id}")]
-        public async Task<IActionResult> UpdatePaymentMethod(int id, [FromBody] UpdatePaymentMethodRequest request)
+        [HttpGet("client-payment-methods/{clientId}")]
+        public IActionResult GetClientPaymentMethods(int clientId)
         {
-            try
-            {
-                var paymentMethod = await _paymentTypeService.GetByIdAsync(id);
-                if (paymentMethod == null)
-                    return NotFound();
-
-                paymentMethod.Name = request.Name;
-                paymentMethod.Description = request.Description;
-                paymentMethod.IsEnabled = request.IsEnabled;
-                paymentMethod.Configuration = request.Configuration;
-                paymentMethod.UpdatedAt = DateTime.UtcNow;
-
-                await _paymentTypeService.UpdateAsync(paymentMethod);
-                return Ok(paymentMethod);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var clientPaymentMethods = _context.WebShopClientPaymentTypes
+                .Include(cpt => cpt.PaymentType)
+                .Where(cpt => cpt.ClientId == clientId)
+                .Select(cpt => new { 
+                    cpt.Id, 
+                    cpt.PaymentTypeId, 
+                    PaymentTypeName = cpt.PaymentType!.Name,
+                    PaymentTypeType = cpt.PaymentType!.Type,
+                    IsEnabled = cpt.PaymentType!.IsEnabled
+                })
+                .ToList();
+            return Ok(clientPaymentMethods);
         }
-
-        /// <summary>
-        /// Delete payment method
-        /// </summary>
-        [HttpDelete("payment-methods/{id}")]
-        public async Task<IActionResult> DeletePaymentMethod(int id)
-        {
-            try
-            {
-                var result = await _paymentTypeService.DeleteAsync(id);
-                if (!result)
-                    return NotFound();
-
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        #endregion
-
-        #region Merchant Payment Methods
-
-        /// <summary>
-        /// Get payment methods for specific merchant
-        /// </summary>
-        [HttpGet("merchants/{merchantId}/payment-methods")]
-        public async Task<IActionResult> GetMerchantPaymentMethods(int merchantId)
-        {
-            try
-            {
-                var merchant = await _clientService.GetByIdWithPaymentTypes(merchantId);
-                if (merchant == null)
-                    return NotFound();
-
-                Console.WriteLine($"[DEBUG] Merchant {merchantId} found: {merchant.Name}");
-                Console.WriteLine($"[DEBUG] Payment types count: {merchant.WebShopClientPaymentTypes?.Count ?? 0}");
-
-                var paymentMethods = new List<object>();
-                
-                if (merchant.WebShopClientPaymentTypes != null)
-                {
-                    paymentMethods = merchant.WebShopClientPaymentTypes
-                        .Select(wcpt => new
-                        {
-                            PaymentTypeId = wcpt.PaymentTypeId,
-                            Name = wcpt.PaymentType?.Name,
-                            Type = wcpt.PaymentType?.Type,
-                            Description = wcpt.PaymentType?.Description,
-                            IsEnabled = wcpt.PaymentType?.IsEnabled ?? false
-                        })
-                        .Cast<object>()
-                        .ToList();
-                }
-
-                Console.WriteLine($"[DEBUG] Returning {paymentMethods.Count} payment methods");
-                return Ok(paymentMethods);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[DEBUG] Error in GetMerchantPaymentMethods: {ex.Message}");
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// Add payment method to merchant
-        /// </summary>
-        [HttpPost("merchants/{merchantId}/payment-methods")]
-        public async Task<IActionResult> AddPaymentMethodToMerchant(int merchantId, [FromBody] AddPaymentMethodToMerchantRequest request)
-        {
-            try
-            {
-                var result = await _clientService.AddPaymentMethodAsync(merchantId, request.PaymentTypeId);
-                if (!result)
-                    return BadRequest(new { message = "Failed to add payment method to merchant" });
-
-                return Ok(new { message = "Payment method added successfully" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// Remove payment method from merchant
-        /// </summary>
-        [HttpDelete("merchants/{merchantId}/payment-methods/{paymentTypeId}")]
-        public async Task<IActionResult> RemovePaymentMethodFromMerchant(int merchantId, int paymentTypeId)
-        {
-            try
-            {
-                var result = await _clientService.RemovePaymentMethodAsync(merchantId, paymentTypeId);
-                if (!result)
-                    return BadRequest(new { message = "Failed to remove payment method from merchant" });
-
-                return Ok(new { message = "Payment method removed successfully" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        #endregion
-
-        #region Statistics
-
-        /// <summary>
-        /// Get PSP statistics
-        /// </summary>
-        [HttpGet("statistics")]
-        public async Task<IActionResult> GetStatistics()
-        {
-            try
-            {
-                var merchants = await _clientService.GetAllAsync();
-                var paymentMethods = await _paymentTypeService.GetAllAsync();
-                var transactions = await _transactionService.GetAllAsync();
-
-                var stats = new
-                {
-                    TotalMerchants = merchants.Count,
-                    ActiveMerchants = merchants.Count(m => m.Status == ClientStatus.Active),
-                    TotalPaymentMethods = paymentMethods.Count,
-                    EnabledPaymentMethods = paymentMethods.Count(pm => pm.IsEnabled),
-                    TotalTransactions = transactions.Count,
-                    CompletedTransactions = transactions.Count(t => t.Status == TransactionStatus.Completed),
-                    TotalVolume = transactions.Where(t => t.Status == TransactionStatus.Completed).Sum(t => t.Amount)
-                };
-
-                return Ok(stats);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        #endregion
-
-        #region Helper Methods
-
-        private string GenerateApiKey()
-        {
-            return "psp_" + Guid.NewGuid().ToString("N")[..32];
-        }
-
-        private string GenerateWebhookSecret()
-        {
-            return "whs_" + Guid.NewGuid().ToString("N")[..32];
-        }
-
-        #endregion
     }
-
-    #region Request/Response Models
-
-    public class CreateMerchantRequest
-    {
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public string? AccountNumber { get; set; }
-        public string MerchantId { get; set; } = string.Empty;
-        public string MerchantPassword { get; set; } = string.Empty;
-        public string? BaseUrl { get; set; }
-    }
-
-    public class UpdateMerchantRequest
-    {
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public string? AccountNumber { get; set; }
-        public string? BaseUrl { get; set; }
-        public ClientStatus Status { get; set; }
-    }
-
-    public class CreatePaymentMethodRequest
-    {
-        public string Name { get; set; } = string.Empty;
-        public string Type { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public bool IsEnabled { get; set; } = true;
-        public string? Configuration { get; set; }
-    }
-
-    public class UpdatePaymentMethodRequest
-    {
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public bool IsEnabled { get; set; }
-        public string? Configuration { get; set; }
-    }
-
-    public class AddPaymentMethodToMerchantRequest
-    {
-        public int PaymentTypeId { get; set; }
-    }
-
-    #endregion
 }

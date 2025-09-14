@@ -12,6 +12,7 @@ import Transactions from './components/Transactions';
 import PaymentSelection from './components/PaymentSelection';
 import PSPPaymentSelection from './components/PSPPaymentSelection';
 import CustomerPaymentSelection from './components/CustomerPaymentSelection';
+import PaymentSelectionLanding from './components/PaymentSelectionLanding';
 import TelecomDemo from './components/TelecomDemo';
 import WebShop from './components/WebShop';
 import AdminAuth from './components/AdminAuth';
@@ -23,6 +24,7 @@ function App() {
         <Routes>
           <Route path="/webshop/*" element={<WebShop />} />
           <Route path="/telecom-demo" element={<TelecomDemo />} />
+          <Route path="/payment-selection" element={<PaymentSelectionLanding />} />
           <Route path="/payment-selection/:transactionId" element={<CustomerPaymentSelection />} />
           <Route path="/old-payment-selection/:transactionId" element={<PSPPaymentSelection />} />
           <Route path="/*" element={

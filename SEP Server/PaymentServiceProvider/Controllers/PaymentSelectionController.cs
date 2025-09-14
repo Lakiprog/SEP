@@ -131,6 +131,69 @@ namespace PaymentServiceProvider.Controllers
         }
 
         /// <summary>
+        /// Process QR payment
+        /// </summary>
+        [HttpPost("{pspTransactionId}/qr-payment")]
+        public async Task<IActionResult> ProcessQRPayment(
+            string pspTransactionId,
+            [FromBody] QRPaymentRequest request)
+        {
+            try
+            {
+                var transaction = await _pspService.GetTransactionAsync(pspTransactionId);
+                if (transaction == null)
+                    return NotFound(new { message = "Transaction not found" });
+
+                if (transaction.Status != TransactionStatus.Pending)
+                    return BadRequest(new { message = "Transaction is not in pending status" });
+
+                // Validate QR code format
+                if (string.IsNullOrEmpty(request.QRCode))
+                    return BadRequest(new { message = "QR code is required" });
+
+                // Validate QR code using BankService
+                var qrValidationResult = await ValidateQRCodeWithBankService(request.QRCode, transaction);
+                if (!qrValidationResult.IsValid)
+                {
+                    return BadRequest(new { 
+                        message = "Invalid QR code", 
+                        details = qrValidationResult.ErrorMessage 
+                    });
+                }
+
+                // Process the QR payment
+                var paymentData = new Dictionary<string, object>
+                {
+                    ["qrCode"] = request.QRCode,
+                    ["qrData"] = qrValidationResult.ParsedData ?? new Dictionary<string, object>(),
+                    ["processedAt"] = DateTime.UtcNow,
+                    ["userAgent"] = Request.Headers.UserAgent.ToString(),
+                    ["ipAddress"] = GetClientIpAddress()
+                };
+
+                var response = await _pspService.ProcessPaymentAsync(pspTransactionId, "qr", paymentData);
+
+                return Ok(new QRPaymentResponse
+                {
+                    Success = response.Success,
+                    Message = response.Success ? "QR payment processed successfully" : (response.Message ?? "QR payment failed"),
+                    TransactionId = pspTransactionId,
+                    Amount = transaction.Amount,
+                    Currency = transaction.Currency,
+                    Status = response.Success ? "Completed" : "Failed",
+                    RedirectUrl = response.PaymentUrl
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { 
+                    message = "QR payment failed", 
+                    error = ex.Message 
+                });
+            }
+        }
+
+        /// <summary>
         /// Get payment method details
         /// </summary>
         [HttpGet("payment-methods/{paymentType}")]
@@ -165,7 +228,7 @@ namespace PaymentServiceProvider.Controllers
 
         private async Task<List<PaymentMethod>> GetAvailablePaymentMethodsForMerchant(int merchantId)
         {
-            var merchant = await _clientService.GetById(merchantId);
+            var merchant = await _clientService.GetByIdWithPaymentTypes(merchantId);
             if (merchant?.WebShopClientPaymentTypes == null)
                 return new List<PaymentMethod>();
 
@@ -241,6 +304,64 @@ namespace PaymentServiceProvider.Controllers
                 "qr" => new PaymentMethodFees { Percentage = 0.5m, Fixed = 0m, Currency = "RSD" },
                 _ => new PaymentMethodFees { Percentage = 2.0m, Fixed = 0.20m, Currency = "USD" }
             };
+        }
+
+        private async Task<QRValidationResult> ValidateQRCodeWithBankService(string qrCode, Models.Transaction transaction)
+        {
+            try
+            {
+                // Create HTTP client to call BankService
+                using var httpClient = new HttpClient();
+                httpClient.BaseAddress = new Uri("https://localhost:5001"); // BankService port
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+                // Prepare validation request
+                var validationRequest = new
+                {
+                    QRCode = qrCode,
+                    ExpectedAmount = transaction.Amount,
+                    ExpectedCurrency = transaction.Currency,
+                    MerchantId = transaction.WebShopClient?.MerchantId
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(validationRequest);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                // Call BankService QR validation endpoint
+                var response = await httpClient.PostAsync("/api/qr/validate", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var validationResponse = System.Text.Json.JsonSerializer.Deserialize<BankQRValidationResponse>(
+                        responseContent, 
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+
+                    return new QRValidationResult
+                    {
+                        IsValid = validationResponse?.IsValid ?? false,
+                        ErrorMessage = validationResponse?.ErrorMessage,
+                        ParsedData = validationResponse?.ParsedData
+                    };
+                }
+                else
+                {
+                    return new QRValidationResult
+                    {
+                        IsValid = false,
+                        ErrorMessage = $"Bank service validation failed: {response.StatusCode}"
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new QRValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = $"QR validation error: {ex.Message}"
+                };
+            }
         }
 
         private string GetClientIpAddress()

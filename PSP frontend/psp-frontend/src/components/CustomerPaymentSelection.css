@@ -1,8 +1,8 @@
 .customer-payment-container {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .payment-header {
@@ -199,6 +199,72 @@
   margin-bottom: 40px;
 }
 
+.qr-payment-section {
+  margin-bottom: 40px;
+  display: flex;
+  justify-content: center;
+}
+
+.qr-input-card {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  min-width: 500px;
+  max-width: 600px;
+  width: 100%;
+}
+
+.qr-input-card h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.qr-input-card p {
+  margin: 0 0 20px 0;
+  color: #666;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.qr-input-group {
+  margin-bottom: 25px;
+}
+
+.qr-textarea {
+  width: 100%;
+  padding: 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+  min-height: 100px;
+  box-sizing: border-box;
+  transition: border-color 0.3s ease;
+}
+
+.qr-textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.qr-textarea::placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+.qr-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
 .btn {
   padding: 15px 30px;
   border: none;
@@ -353,6 +419,21 @@
   }
   
   .btn {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .qr-input-card {
+    min-width: auto;
+    padding: 20px;
+  }
+  
+  .qr-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .qr-actions .btn {
     width: 100%;
     max-width: 300px;
   }
