@@ -1,5 +1,8 @@
 ﻿using PaymentCardCenterService.Interfaces;
 using PaymentCardCenterService.Dto;
+using PaymentCardCenterService.Data;
+using PaymentCardCenterService.Models;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Text;
 
@@ -8,22 +11,14 @@ namespace PaymentCardCenterService.Services
     public class PCCService : IPCCService
     {
         private readonly HttpClient _httpClient;
+        private readonly PCCDbContext _dbContext;
         private readonly List<PCCTransaction> _transactions;
-        private readonly Dictionary<string, string> _bankRouting; // PAN prefix to bank URL mapping
 
-        public PCCService(HttpClient httpClient)
+        public PCCService(HttpClient httpClient, PCCDbContext dbContext)
         {
             _httpClient = httpClient;
+            _dbContext = dbContext;
             _transactions = new List<PCCTransaction>();
-            
-            // Initialize bank routing table (PAN prefix to bank URL)
-            _bankRouting = new Dictionary<string, string>
-            {
-                { "4111", "https://localhost:7001" }, // Bank A
-                { "5555", "https://localhost:7001" }, // Bank A
-                { "4000", "https://localhost:7001" }, // Bank B (different port for demo)
-                { "3000", "https://localhost:7001" }  // Bank C (different port for demo)
-            };
         }
 
         // Implement the interface method
@@ -77,27 +72,48 @@ namespace PaymentCardCenterService.Services
         {
             try
             {
+                Console.WriteLine($"[PCC DEBUG] Processing payment request for PAN: {request.CardData.Pan.Substring(0, 4)}****, Amount: {request.Amount}");
+                
                 // Record the transaction
                 var pccTransaction = await RecordTransaction(request);
 
                 // Get issuer bank URL based on PAN
                 var issuerBankUrl = await GetIssuerBankUrl(request.CardData.Pan);
+                
+                if (string.IsNullOrEmpty(issuerBankUrl))
+                {
+                    Console.WriteLine($"[PCC ERROR] No issuer bank found for BIN: {request.CardData.Pan.Substring(0, 4)}");
+                    return new PCCPaymentResponse
+                    {
+                        Success = false,
+                        Status = TransactionStatus.Failed,
+                        ErrorMessage = "Issuer bank not found for this card",
+                        StatusMessage = "Card not supported - unknown bank identifier",
+                        AcquirerOrderId = request.AcquirerOrderId,
+                        AcquirerTimestamp = request.AcquirerTimestamp
+                    };
+                }
 
                 // Forward to issuer bank
+                Console.WriteLine($"[PCC DEBUG] Forwarding request to issuer bank: {issuerBankUrl}");
                 var issuerResponse = await ForwardToIssuerBank(issuerBankUrl, request);
 
                 // Process issuer response
                 var pccResponse = await ProcessIssuerResponse(issuerResponse, pccTransaction);
+                Console.WriteLine($"[PCC DEBUG] Processed issuer response: Success={pccResponse.Success}, Status={pccResponse.Status}");
 
                 return pccResponse;
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[PCC ERROR] Exception processing payment: {ex.Message}");
                 return new PCCPaymentResponse
                 {
                     Success = false,
                     Status = TransactionStatus.Failed,
-                    ErrorMessage = ex.Message
+                    ErrorMessage = ex.Message,
+                    AcquirerOrderId = request.AcquirerOrderId,
+                    AcquirerTimestamp = request.AcquirerTimestamp
                 };
             }
         }
@@ -122,16 +138,34 @@ namespace PaymentCardCenterService.Services
 
         public async Task<string> GetIssuerBankUrl(string pan)
         {
-            // Extract PAN prefix (first 4 digits)
-            var panPrefix = pan.Length >= 4 ? pan.Substring(0, 4) : pan;
-            
-            if (_bankRouting.ContainsKey(panPrefix))
+            try
             {
-                return await Task.FromResult(_bankRouting[panPrefix]);
-            }
+                // Extract BIN (first 4 digits) from PAN
+                var bin = pan.Length >= 4 ? pan.Substring(0, 4) : pan;
+                
+                Console.WriteLine($"[PCC DEBUG] Looking up issuer bank for BIN: {bin}");
+                
+                // Query database for BIN code and associated bank
+                var binRange = await _dbContext.BinRanges
+                    .Include(br => br.Bank)
+                    .FirstOrDefaultAsync(br => br.BinCode == bin && br.IsActive && br.Bank.IsActive);
+                
+                if (binRange != null && binRange.Bank != null)
+                {
+                    var bankUrl = binRange.Bank.ApiUrl;
+                    Console.WriteLine($"[PCC DEBUG] Found issuer bank: {binRange.Bank.Name} ({bankUrl}) for BIN: {bin} ({binRange.CardType})");
+                    return bankUrl;
+                }
 
-            // Default to first available bank if no specific routing found
-            return await Task.FromResult(_bankRouting.Values.First());
+                // No issuer bank found for this BIN - return empty string to indicate error
+                Console.WriteLine($"[PCC ERROR] No issuer bank found for BIN: {bin}");
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[PCC ERROR] Database error looking up BIN {pan.Substring(0, 4)}: {ex.Message}");
+                return string.Empty;
+            }
         }
 
         public async Task<IssuerBankResponse> ForwardToIssuerBank(string issuerBankUrl, PCCPaymentRequest request)
@@ -212,7 +246,7 @@ namespace PaymentCardCenterService.Services
             return await Task.FromResult(response);
         }
 
-        public async Task<PCCTransaction> GetTransactionByAcquirerOrderId(string acquirerOrderId)
+        public async Task<PCCTransaction?> GetTransactionByAcquirerOrderId(string acquirerOrderId)
         {
             var transaction = _transactions.FirstOrDefault(t => t.AcquirerOrderId == acquirerOrderId);
             return await Task.FromResult(transaction);
@@ -221,6 +255,43 @@ namespace PaymentCardCenterService.Services
         public async Task<List<PCCTransaction>> GetAllTransactions()
         {
             return await Task.FromResult(_transactions.ToList());
+        }
+
+        public async Task<List<object>> GetAllBanksWithBinRanges()
+        {
+            try
+            {
+                var banks = await _dbContext.Banks
+                    .Include(b => b.BinRanges)
+                    .Where(b => b.IsActive)
+                    .Select(b => new
+                    {
+                        b.Id,
+                        b.Name,
+                        b.ApiUrl,
+                        b.ContactEmail,
+                        b.ContactPhone,
+                        b.IsActive,
+                        b.CreatedAt,
+                        BinRanges = b.BinRanges.Where(br => br.IsActive).Select(br => new
+                        {
+                            br.Id,
+                            br.BinCode,
+                            br.CardType,
+                            br.Description,
+                            br.IsActive,
+                            br.CreatedAt
+                        }).ToList()
+                    })
+                    .ToListAsync();
+
+                return banks.Cast<object>().ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[PCC ERROR] Error retrieving banks and BIN ranges: {ex.Message}");
+                return new List<object>();
+            }
         }
     }
 

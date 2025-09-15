@@ -1,0 +1,273 @@
+.card-payment-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #4ade80 0%, #059669 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.card-payment-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  padding: 40px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+.bank-header {
+  margin-bottom: 30px;
+}
+
+.bank-header h1 {
+  color: #065f46;
+  margin: 0 0 10px 0;
+  font-size: 2.5em;
+  font-weight: bold;
+}
+
+.bank-header p {
+  color: #6b7280;
+  margin: 0;
+  font-size: 1.1em;
+}
+
+.payment-info {
+  background: #f0fdf4;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 30px;
+  text-align: left;
+  border: 2px solid #86efac;
+}
+
+.payment-info h3 {
+  color: #065f46;
+  margin-top: 0;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 1.4em;
+}
+
+.payment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #d1fae5;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-row span:first-child {
+  font-weight: 500;
+  color: #374151;
+}
+
+.detail-row span:last-child {
+  font-weight: 600;
+  color: #065f46;
+}
+
+.amount {
+  color: #059669 !important;
+  font-size: 1.3em !important;
+  font-weight: bold !important;
+}
+
+.card-form {
+  background: #fafafa;
+  border-radius: 12px;
+  padding: 30px;
+  margin-bottom: 30px;
+  text-align: left;
+}
+
+.card-form h3 {
+  color: #065f46;
+  margin-top: 0;
+  margin-bottom: 25px;
+  text-align: center;
+  font-size: 1.4em;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group.half {
+  flex: 1;
+}
+
+.form-row {
+  display: flex;
+  gap: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9em;
+}
+
+.card-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1em;
+  font-family: 'Courier New', monospace;
+  transition: all 0.3s;
+  background: white;
+}
+
+.card-input:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.card-input.error {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.card-input.error:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.error-message {
+  display: block;
+  color: #ef4444;
+  font-size: 0.85em;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+.card-input::placeholder {
+  color: #9ca3af;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin: 30px 0;
+}
+
+.btn {
+  padding: 15px 30px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  min-width: 140px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+}
+
+.btn-secondary {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 2px solid #d1d5db;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.security-notice {
+  margin-top: 30px;
+  padding: 20px;
+  background: #ecfdf5;
+  border-radius: 8px;
+  border: 1px solid #86efac;
+  color: #065f46;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.security-notice p {
+  margin: 5px 0;
+}
+
+.loading {
+  text-align: center;
+  padding: 50px;
+  color: white;
+}
+
+.spinner {
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid white;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .card-payment-container {
+    padding: 10px;
+  }
+  
+  .card-payment-card {
+    padding: 20px;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .btn {
+    width: 100%;
+    max-width: 250px;
+  }
+  
+  .bank-header h1 {
+    font-size: 2em;
+  }
+}

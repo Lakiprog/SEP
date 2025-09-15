@@ -14,7 +14,7 @@ namespace BankService.Data.Configuration
             builder.Property(x => x.CardNumber).IsRequired();
             builder.Property(x => x.CardHolderName).IsRequired();
             builder.Property(x => x.ExpiryDate).IsRequired();
-            builder.Property(x => x.CVC).IsRequired();
+            builder.Property(x => x.SecurityCode).IsRequired();
 
             builder.HasOne(x => x.BankAccount)
                 .WithMany(x => x.PaymentCards)

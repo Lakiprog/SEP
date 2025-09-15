@@ -10,7 +10,8 @@ namespace PaymentCardCenterService.Interfaces
         Task<string> GetIssuerBankUrl(string pan);
         Task<IssuerBankResponse> ForwardToIssuerBank(string issuerBankUrl, PCCPaymentRequest request);
         Task<PCCPaymentResponse> ProcessIssuerResponse(IssuerBankResponse issuerResponse, PCCTransaction pccTransaction);
-        Task<PCCTransaction> GetTransactionByAcquirerOrderId(string acquirerOrderId);
+        Task<PCCTransaction?> GetTransactionByAcquirerOrderId(string acquirerOrderId);
         Task<List<PCCTransaction>> GetAllTransactions();
+        Task<List<object>> GetAllBanksWithBinRanges();
     }
 }

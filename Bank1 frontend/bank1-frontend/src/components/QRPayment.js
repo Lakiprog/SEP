@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { bankAPI } from '../services/api';
 import { toast } from 'react-toastify';
@@ -14,6 +14,9 @@ const QRPayment = () => {
   const [qrCodeImage, setQrCodeImage] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [paymentId, setPaymentId] = useState('');
+  
+  // Ref to prevent duplicate API calls in React StrictMode
+  const hasInitialized = useRef(false);
 
   // Extract parameters from URL
   const amount = searchParams.get('amount');
@@ -25,7 +28,12 @@ const QRPayment = () => {
   const cancelUrl = searchParams.get('cancelUrl');
 
   useEffect(() => {
+    // Prevent duplicate calls in React StrictMode
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+    
     if (amount && currency && merchantId) {
+      console.log('[QR DEBUG] Initializing QR code generation...');
       generateQRCode();
     } else {
       toast.error('Invalid payment parameters');

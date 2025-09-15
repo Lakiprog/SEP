@@ -98,5 +98,72 @@ namespace PaymentCardCenterService.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        /// <summary>
+        /// Get all banks and their BIN ranges
+        /// </summary>
+        [HttpGet("banks")]
+        public async Task<IActionResult> GetAllBanks()
+        {
+            try
+            {
+                var banks = await _pccService.GetAllBanksWithBinRanges();
+                return Ok(banks);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Get BIN lookup information for debugging
+        /// </summary>
+        [HttpGet("bin-lookup/{binCode}")]
+        public async Task<IActionResult> GetBinLookup(string binCode)
+        {
+            try
+            {
+                var bankUrl = await _pccService.GetIssuerBankUrl(binCode + "0000000000000"); // Pad with zeros for lookup
+                if (string.IsNullOrEmpty(bankUrl))
+                {
+                    return NotFound(new { message = $"No issuer bank found for BIN: {binCode}" });
+                }
+                return Ok(new { binCode, bankUrl });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Health check endpoint to verify PCC system status
+        /// </summary>
+        [HttpGet("health")]
+        public async Task<IActionResult> HealthCheck()
+        {
+            try
+            {
+                var banks = await _pccService.GetAllBanksWithBinRanges();
+                return Ok(new 
+                {
+                    status = "healthy",
+                    timestamp = DateTime.UtcNow,
+                    banksCount = banks.Count,
+                    message = "PCC system is operational with database connectivity"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new 
+                {
+                    status = "unhealthy",
+                    timestamp = DateTime.UtcNow,
+                    error = ex.Message,
+                    message = "PCC system database connectivity failed"
+                });
+            }
+        }
     }
 }

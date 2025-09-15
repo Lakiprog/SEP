@@ -30,10 +30,27 @@ namespace BankService.Services
                 var client = _httpClientFactory.CreateClient();
                 var pccUrl = _configuration["PCC:BaseUrl"] ?? "https://localhost:7004";
 
-                var jsonContent = JsonSerializer.Serialize(request);
+                // Map PCCRequest to the format PCC expects (PCCPaymentRequest)
+                var pccPaymentRequest = new
+                {
+                    AcquirerOrderId = request.AcquirerOrderId,
+                    AcquirerTimestamp = request.AcquirerTimestamp,
+                    CardData = new
+                    {
+                        Pan = request.PAN,
+                        SecurityCode = request.SecurityCode,
+                        CardHolderName = request.CardHolderName,
+                        ExpiryDate = request.ExpiryDate
+                    },
+                    Amount = request.Amount,
+                    Currency = request.Currency,
+                    MerchantId = request.MerchantId
+                };
+
+                var jsonContent = JsonSerializer.Serialize(pccPaymentRequest);
                 var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
 
-                _logger.LogInformation($"Sending transaction to PCC: {request.AcquirerOrderId}");
+                _logger.LogInformation($"Sending transaction to PCC: {request.AcquirerOrderId} for PAN: {request.PAN?.Substring(0, 4)}****");
 
                 var response = await client.PostAsync($"{pccUrl}/api/pcc/process-payment", content);
 
@@ -52,11 +69,12 @@ namespace BankService.Services
                 }
                 else
                 {
-                    _logger.LogError($"PCC communication failed: {response.StatusCode}");
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError($"PCC communication failed: {response.StatusCode}, Response: {errorContent}");
                     return new PCCResponse
                     {
                         Success = false,
-                        ErrorMessage = $"PCC communication failed: {response.StatusCode}",
+                        ErrorMessage = $"PCC communication failed: {response.StatusCode} - {errorContent}",
                         Status = Models.TransactionStatus.Failed
                     };
                 }

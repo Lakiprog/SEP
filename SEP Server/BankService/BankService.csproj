@@ -31,4 +31,8 @@
     <Folder Include="Services\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\PaymentCardCenterService\PaymentCardCenterService.csproj" />
+  </ItemGroup>
+
 </Project>
