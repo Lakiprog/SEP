@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { bankAPI } from '../services/api';
 import { toast } from 'react-toastify';
@@ -10,6 +10,9 @@ const CardPayment = () => {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+  
+  // Ref to prevent duplicate API calls in React StrictMode
+  const hasInitialized = useRef(false);
   
   // Card form data
   const [cardData, setCardData] = useState({
@@ -64,7 +67,12 @@ const CardPayment = () => {
   }, [amount, currency, merchantId, orderId]);
 
   useEffect(() => {
+    // Prevent duplicate calls in React StrictMode
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+    
     if (amount && merchantId) {
+      console.log('[CARD DEBUG] Initializing payment ID generation...');
       generatePaymentId();
     } else {
       toast.error('Invalid payment parameters');

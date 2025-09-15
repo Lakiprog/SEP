@@ -326,6 +326,8 @@ namespace BankService.Controllers
 
         private async Task<TransactionResult> ProcessTransactionThroughPCC(TransactionProcessingRequest request)
         {
+            Console.WriteLine($"[BANK DEBUG] Preparing PCC request for external card: {request.PAN.Substring(0, 4)}****");
+            
             var pccRequest = new BankService.Models.PCCRequest
             {
                 PAN = request.PAN,
@@ -335,10 +337,20 @@ namespace BankService.Controllers
                 Amount = request.Amount,
                 Currency = "RSD",
                 AcquirerOrderId = Guid.NewGuid().ToString(),
-                AcquirerTimestamp = DateTime.UtcNow
+                AcquirerTimestamp = DateTime.UtcNow,
+                MerchantId = "1", // Default merchant ID for Bank1
+                CardData = new BankService.Models.CardData
+                {
+                    Pan = request.PAN,
+                    SecurityCode = request.SecurityCode,
+                    CardHolderName = request.CardHolderName,
+                    ExpiryDate = request.ExpiryDate
+                }
             };
 
+            Console.WriteLine($"[BANK DEBUG] Sending transaction to PCC: AcquirerOrderId={pccRequest.AcquirerOrderId}");
             var pccResponse = await _pccCommunicationService.SendTransactionToPCC(pccRequest);
+            Console.WriteLine($"[BANK DEBUG] PCC response received: Success={pccResponse?.Success}, Message={pccResponse?.StatusMessage}");
 
             return new TransactionResult
             {
@@ -346,6 +358,111 @@ namespace BankService.Controllers
                 TransactionId = pccResponse?.TransactionId ?? Guid.NewGuid().ToString(),
                 Message = (pccResponse?.Success ?? false) ? "Transaction processed successfully" : (pccResponse?.ErrorMessage ?? "Unknown error")
             };
+        }
+
+        [HttpPost("issuer/process")]
+        public async Task<IActionResult> ProcessIssuerRequest([FromBody] PaymentCardCenterService.Dto.IssuerBankRequest request)
+        {
+            try
+            {
+                Console.WriteLine($"[BANK DEBUG] Received issuer request from PCC for PAN: {request.Pan.Substring(0, 4)}****, Amount: {request.Amount}");
+                
+                // Convert IssuerBankRequest to internal TransactionProcessingRequest
+                var internalRequest = new TransactionProcessingRequest
+                {
+                    PAYMENT_ID = request.AcquirerOrderId, // Use acquirer order ID as payment ID
+                    PAN = request.Pan,
+                    SecurityCode = request.SecurityCode,
+                    CardHolderName = request.CardHolderName,
+                    ExpiryDate = request.ExpiryDate,
+                    Amount = request.Amount
+                };
+
+                // Create a temporary transaction record for issuer processing
+                var tempTransaction = new BankTransaction
+                {
+                    PaymentId = request.AcquirerOrderId,
+                    Amount = request.Amount,
+                    Status = "PENDING",
+                    CreatedAt = DateTime.UtcNow,
+                    MerchantOrderId = request.MerchantId,
+                    MerchantTimestamp = request.AcquirerTimestamp,
+                    AcquirerTimestamp = DateTime.UtcNow,
+                    IssuerTimestamp = DateTime.UtcNow,
+                    MerchantId = 1, // Default merchant ID
+                    RegularUserId = 1 // Default user ID
+                };
+
+                await _bankTransactionRepository.AddAsync(tempTransaction);
+
+                // Validate card data
+                var cardValidation = await _paymentCardService.ValidateCardAsync(
+                    request.Pan, request.SecurityCode, request.CardHolderName, request.ExpiryDate);
+
+                if (!cardValidation.IsValid)
+                {
+                    Console.WriteLine($"[BANK ERROR] Card validation failed: {cardValidation.ErrorMessage}");
+                    return Ok(new PaymentCardCenterService.Dto.IssuerBankResponse
+                    {
+                        Success = false,
+                        Status = (PaymentCardCenterService.Dto.TransactionStatus)BankService.Models.TransactionStatus.Failed,
+                        StatusMessage = cardValidation.ErrorMessage,
+                        IssuerOrderId = Guid.NewGuid().ToString(),
+                        IssuerTimestamp = DateTime.UtcNow
+                    });
+                }
+
+                // Check if card belongs to this bank
+                var card = await _paymentCardRepository.GetByPANAsync(request.Pan);
+                TransactionResult transactionResult;
+
+                if (card != null)
+                {
+                    // Internal card - process within the same bank
+                    Console.WriteLine($"[BANK DEBUG] Processing internal card for issuer request");
+                    transactionResult = await ProcessInternalTransaction(internalRequest, card);
+                }
+                else
+                {
+                    // Card doesn't belong to this bank - this shouldn't happen if PCC routing is correct
+                    Console.WriteLine($"[BANK ERROR] Card doesn't belong to this bank, PCC routing error");
+                    transactionResult = new TransactionResult
+                    {
+                        Success = false,
+                        TransactionId = Guid.NewGuid().ToString(),
+                        Message = "Card not issued by this bank"
+                    };
+                }
+
+                // Update transaction status
+                tempTransaction.Status = transactionResult.Success ? "SUCCESS" : "FAILED";
+                tempTransaction.ProcessedAt = DateTime.UtcNow;
+                await _bankTransactionRepository.UpdateAsync(tempTransaction);
+
+                Console.WriteLine($"[BANK DEBUG] Issuer processing result: Success={transactionResult.Success}, Message={transactionResult.Message}");
+
+                // Return response to PCC
+                return Ok(new PaymentCardCenterService.Dto.IssuerBankResponse
+                {
+                    Success = transactionResult.Success,
+                    IssuerOrderId = transactionResult.TransactionId,
+                    IssuerTimestamp = DateTime.UtcNow,
+                    Status = transactionResult.Success ? (PaymentCardCenterService.Dto.TransactionStatus)BankService.Models.TransactionStatus.Completed : (PaymentCardCenterService.Dto.TransactionStatus)BankService.Models.TransactionStatus.Failed,
+                    StatusMessage = transactionResult.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[BANK ERROR] Exception processing issuer request: {ex.Message}");
+                return Ok(new PaymentCardCenterService.Dto.IssuerBankResponse
+                {
+                    Success = false,
+                    Status = (PaymentCardCenterService.Dto.TransactionStatus)BankService.Models.TransactionStatus.Failed,
+                    StatusMessage = ex.Message,
+                    IssuerOrderId = Guid.NewGuid().ToString(),
+                    IssuerTimestamp = DateTime.UtcNow
+                });
+            }
         }
 
         [HttpPost("process-qr-transaction")]
