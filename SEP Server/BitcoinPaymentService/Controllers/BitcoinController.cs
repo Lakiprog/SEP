@@ -39,7 +39,7 @@ namespace BitcoinPaymentService.Controllers
 
                 _payments[paymentId] = payment;
 
-                var amountBtc = _bitcoinService.ConvertToBTC(request.Amount);
+                var amountBtc = await _bitcoinService.ConvertToBTC(request.Amount);
                 var qrCode = _bitcoinService.GenerateQRCode(bitcoinAddress, amountBtc);
 
                 return Ok(new
@@ -71,7 +71,8 @@ namespace BitcoinPaymentService.Controllers
                 var payment = _payments[paymentId];
 
                 // Check Bitcoin blockchain for payment
-                var isPaid = await _bitcoinService.VerifyPayment(payment.BitcoinAddress, payment.Amount);
+                var amountBtc = await _bitcoinService.ConvertToBTC(payment.Amount);
+                var isPaid = await _bitcoinService.VerifyPayment(payment.BitcoinAddress, amountBtc);
 
                 if (isPaid && payment.Status == "PENDING")
                 {

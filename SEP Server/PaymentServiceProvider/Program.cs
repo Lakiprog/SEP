@@ -5,6 +5,7 @@ using PaymentServiceProvider.Interfaces;
 using PaymentServiceProvider.Repository;
 using PaymentServiceProvider.Services;
 using PaymentServiceProvider.Services.Plugins;
+using Consul;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,6 +64,17 @@ builder.Services.AddScoped<IPaymentTypeService, PaymentTypeService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IWebShopClientService, WebShopClientService>();
 
+//Add Consul Service Discovery
+builder.Services.AddSingleton<IConsulClient>(provider =>
+{
+    var consulConfig = new ConsulClientConfiguration
+    {
+        Address = new Uri("http://localhost:8500")
+    };
+    return new ConsulClient(consulConfig);
+});
+builder.Services.AddScoped<IServiceDiscoveryClient, ConsulServiceDiscoveryClient>();
+
 //Add PSP Services
 builder.Services.AddScoped<IPSPService, PSPService>();
 builder.Services.AddScoped<IPaymentPluginManager, PaymentPluginManager>();
@@ -80,6 +92,16 @@ builder.Services.AddHttpClient<CardPaymentPlugin>();
 builder.Services.AddHttpClient<PayPalPaymentPlugin>(client =>
 {
     client.DefaultRequestHeaders.Add("User-Agent", "PSP-PayPalPlugin/1.0");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
+{
+    ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+});
+
+// Add HttpClient for Bitcoin communication
+builder.Services.AddHttpClient<BitcoinPaymentPlugin>(client =>
+{
+    client.DefaultRequestHeaders.Add("User-Agent", "PSP-BitcoinPlugin/1.0");
 })
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
 {
@@ -122,6 +144,56 @@ app.UseStaticFiles();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Health check endpoint
+app.MapGet("/health", () => new { status = "healthy", service = "payment-service-provider", timestamp = DateTime.UtcNow });
+
+// Setup Consul registration and deregistration
+var consulClient = app.Services.GetRequiredService<IConsulClient>();
+var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+
+lifetime.ApplicationStarted.Register(async () =>
+{
+    try
+    {
+        var registration = new AgentServiceRegistration
+        {
+            ID = "payment-service-provider-1",
+            Name = "payment-service-provider",
+            Address = "localhost",
+            Port = 7001,
+            Tags = new[] { "payment", "psp", "gateway" },
+            Check = new AgentServiceCheck
+            {
+                HTTP = "https://localhost:7001/health",
+                Interval = TimeSpan.FromSeconds(10),
+                Timeout = TimeSpan.FromSeconds(5),
+                DeregisterCriticalServiceAfter = TimeSpan.FromMinutes(1)
+            }
+        };
+
+        await consulClient.Agent.ServiceRegister(registration);
+        Console.WriteLine("[DEBUG] PSP registered with Consul");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[DEBUG] Failed to register PSP with Consul: {ex.Message}");
+        Console.WriteLine("[DEBUG] PSP running without service discovery");
+    }
+});
+
+lifetime.ApplicationStopping.Register(async () =>
+{
+    try
+    {
+        await consulClient.Agent.ServiceDeregister("payment-service-provider-1");
+        Console.WriteLine("[DEBUG] PSP deregistered from Consul");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[DEBUG] Failed to deregister PSP from Consul: {ex.Message}");
+    }
+});
 
 // Initialize PSP plugins and seed data
 Console.WriteLine("[DEBUG] Starting PSP initialization...");
@@ -224,6 +296,7 @@ using (var scope = app.Services.CreateScope())
     }
     
     Console.WriteLine("[DEBUG] PSP initialization completed successfully!");
+
 }
 
 app.Run();

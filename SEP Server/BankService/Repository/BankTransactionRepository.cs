@@ -21,7 +21,19 @@ namespace BankService.Repository
 
         public async Task UpdateAsync(BankTransaction entity)
         {
-            _context.BankTransactions.Update(entity);
+            var existingEntity = _context.Entry(entity);
+            if (existingEntity.State == EntityState.Detached)
+            {
+                var tracked = await _context.BankTransactions.FindAsync(entity.Id);
+                if (tracked != null)
+                {
+                    _context.Entry(tracked).CurrentValues.SetValues(entity);
+                }
+                else
+                {
+                    _context.BankTransactions.Update(entity);
+                }
+            }
             await _context.SaveChangesAsync();
         }
 

@@ -3,6 +3,7 @@ using BankService.Interfaces;
 using BankService.Repository;
 using BankService.Services;
 using Microsoft.EntityFrameworkCore;
+using Consul;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,16 @@ builder.Services.AddSingleton<ILogger<PCCCommunicationService>>(provider =>
 // Add configuration
 builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 
+// Add Consul
+builder.Services.AddSingleton<IConsulClient>(provider =>
+{
+    var consulConfig = new ConsulClientConfiguration
+    {
+        Address = new Uri("http://localhost:8500")
+    };
+    return new ConsulClient(consulConfig);
+});
+
 //Add Repository implementations
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IBankAccountRepository, BankAccountRepository>();
@@ -57,6 +68,56 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Health check endpoint
+app.MapGet("/health", () => new { status = "healthy", service = "bank-service", timestamp = DateTime.UtcNow });
+
+// Register with Consul
+var consulClient = app.Services.GetRequiredService<IConsulClient>();
+var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+
+lifetime.ApplicationStarted.Register(async () =>
+{
+    try
+    {
+        var registration = new AgentServiceRegistration
+        {
+            ID = "bank-service-1",
+            Name = "bank-service",
+            Address = "localhost",
+            Port = 7004,
+            Tags = new[] { "payment", "bank", "internal" },
+            Check = new AgentServiceCheck
+            {
+                HTTP = "https://localhost:7004/health",
+                Interval = TimeSpan.FromSeconds(10),
+                Timeout = TimeSpan.FromSeconds(5),
+                DeregisterCriticalServiceAfter = TimeSpan.FromMinutes(1)
+            }
+        };
+
+        await consulClient.Agent.ServiceRegister(registration);
+        Console.WriteLine("Bank Service registered with Consul");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Failed to register with Consul: {ex.Message}");
+        Console.WriteLine("Bank Service running without service discovery");
+    }
+});
+
+lifetime.ApplicationStopping.Register(async () =>
+{
+    try
+    {
+        await consulClient.Agent.ServiceDeregister("bank-service-1");
+        Console.WriteLine("Bank Service deregistered from Consul");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Failed to deregister from Consul: {ex.Message}");
+    }
+});
 
 // Seed data
 using (var scope = app.Services.CreateScope())

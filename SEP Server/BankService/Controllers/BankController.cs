@@ -243,10 +243,14 @@ namespace BankService.Controllers
                     transactionResult = await ProcessTransactionThroughPCC(request);
                 }
 
-                // Update transaction status (we already have the transaction from above)
-                transaction.Status = transactionResult.Success ? "SUCCESS" : "FAILED";
-                transaction.ProcessedAt = DateTime.UtcNow;
-                await _bankTransactionRepository.UpdateAsync(transaction);
+                // Update transaction status - reload the entity to ensure it's properly tracked
+                var trackedTransaction = await _bankTransactionRepository.GetByPaymentIdAsync(request.PAYMENT_ID);
+                if (trackedTransaction != null)
+                {
+                    trackedTransaction.Status = transactionResult.Success ? "SUCCESS" : "FAILED";
+                    trackedTransaction.ProcessedAt = DateTime.UtcNow;
+                    await _bankTransactionRepository.UpdateAsync(trackedTransaction);
+                }
 
                 Console.WriteLine($"[DEBUG] Transaction result: Success={transactionResult.Success}, Message={transactionResult.Message}");
 
