@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PaymentServiceProvider.Controllers;
 using PaymentServiceProvider.Data;
 using PaymentServiceProvider.Interfaces;
 using PaymentServiceProvider.Repository;
@@ -74,6 +75,25 @@ builder.Services.AddScoped<IPaymentPlugin, QRPaymentPlugin>();
 
 // Add HttpClient for bank communication
 builder.Services.AddHttpClient<CardPaymentPlugin>();
+
+// Add HttpClient for PayPal communication
+builder.Services.AddHttpClient<PayPalPaymentPlugin>(client =>
+{
+    client.DefaultRequestHeaders.Add("User-Agent", "PSP-PayPalPlugin/1.0");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
+{
+    ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+});
+
+builder.Services.AddHttpClient<PayPalCallbackController>(client =>
+{
+    client.DefaultRequestHeaders.Add("User-Agent", "PSP-PayPalCallback/1.0");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
+{
+    ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+});
 
 
 var app = builder.Build();

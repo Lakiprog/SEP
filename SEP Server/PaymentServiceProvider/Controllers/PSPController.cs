@@ -33,6 +33,72 @@ namespace PaymentServiceProvider.Controllers
         }
 
         /// <summary>
+        /// Debug endpoint to test PayPal service connection
+        /// </summary>
+        [HttpGet("debug/test-paypal")]
+        public async Task<IActionResult> TestPayPalConnection()
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Add("User-Agent", "PSP-Test/1.0");
+                
+                var handler = new HttpClientHandler()
+                {
+                    ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+                };
+                
+                using var client = new HttpClient(handler);
+                
+                var testRequest = new
+                {
+                    amount = 10.00m,
+                    currency = "EUR",
+                    description = "PSP Test Payment",
+                    orderId = "PSP_TEST_" + DateTime.UtcNow.ToString("yyyyMMddHHmmss"),
+                    returnUrl = "https://localhost:7006/api/paypal/return?pspTransactionId=TEST",
+                    cancelUrl = "https://localhost:7006/api/paypal/cancel?pspTransactionId=TEST"
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(testRequest);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var response = await client.PostAsync("https://localhost:7008/api/paypal/create-order", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    return Ok(new
+                    {
+                        Success = true,
+                        Message = "PayPal service connection successful",
+                        PayPalResponse = responseContent
+                    });
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    return BadRequest(new
+                    {
+                        Success = false,
+                        Message = $"PayPal service error: {response.StatusCode}",
+                        Error = errorContent
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    Success = false,
+                    Message = "PayPal service connection failed",
+                    Error = ex.Message,
+                    StackTrace = ex.StackTrace
+                });
+            }
+        }
+
+        /// <summary>
         /// Debug endpoint to manually register plugins
         /// </summary>
         [HttpPost("debug/register-plugins")]
