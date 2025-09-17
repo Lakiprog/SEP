@@ -59,19 +59,27 @@ const CustomerPaymentSelection = () => {
       console.log('🔍 Payment method selection response:', response.data);
       
       // Redirect to the payment service (including QR payment)
-      if (response.data.paymentUrl) {
+      if (response.data.paymentUrl && response.data.paymentUrl.trim() !== '') {
         console.log('🔄 Redirecting to:', response.data.paymentUrl);
         window.location.href = response.data.paymentUrl;
-      } else if (response.data.redirectUrl) {
+      } else if (response.data.redirectUrl && response.data.redirectUrl.trim() !== '') {
         console.log('🔄 Redirecting to:', response.data.redirectUrl);
         window.location.href = response.data.redirectUrl;
       } else {
-        toast.success('Payment method selected successfully');
-        // Handle success case
+        console.log('❌ No payment URL provided:', response.data);
+        toast.error('Payment URL not available. Please try again or contact support.');
       }
     } catch (error) {
       console.error('Error selecting payment method:', error);
-      toast.error('Failed to select payment method');
+      
+      if (error.response?.status === 400) {
+        const errorMessage = error.response.data?.message || 'Transaction is no longer available for payment';
+        toast.error(`Payment failed: ${errorMessage}`);
+      } else if (error.response?.status === 404) {
+        toast.error('Transaction not found. Please refresh the page and try again.');
+      } else {
+        toast.error('Failed to select payment method. Please try again.');
+      }
     } finally {
       setProcessing(false);
     }

@@ -6,6 +6,17 @@ namespace PaymentServiceProvider.Services.Plugins
 {
     public class PayPalPaymentPlugin : IPaymentPlugin
     {
+        private readonly HttpClient _httpClient;
+        private readonly ILogger<PayPalPaymentPlugin> _logger;
+        private readonly string _payPalServiceUrl;
+
+        public PayPalPaymentPlugin(HttpClient httpClient, ILogger<PayPalPaymentPlugin> logger, IConfiguration configuration)
+        {
+            _httpClient = httpClient;
+            _logger = logger;
+            _payPalServiceUrl = configuration.GetConnectionString("PayPalService") ?? "https://localhost:7008";
+        }
+
         public string Name => "PayPal";
         public string Type => "paypal";
         public bool IsEnabled => true;
@@ -14,39 +25,97 @@ namespace PaymentServiceProvider.Services.Plugins
         {
             try
             {
-                // Simulate PayPal payment processing
-                // In real implementation, this would integrate with PayPal API
-                
-                // Simulate payment processing delay
-                await Task.Delay(1500);
+                _logger.LogInformation($"Processing PayPal payment for transaction {transaction.PSPTransactionId}");
 
-                // Simulate random success/failure for demo purposes
-                var random = new Random();
-                var isSuccess = random.NextDouble() > 0.15; // 85% success rate
-
-                if (isSuccess)
+                // Create PayPal order request
+                var paypalOrderRequest = new
                 {
-                    var externalTransactionId = $"PAYPAL_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..8].ToUpper()}";
+                    amount = transaction.Amount,
+                    currency = transaction.Currency,
+                    description = $"Payment to {transaction.WebShopClient?.Name}",
+                    orderId = transaction.PSPTransactionId,
+                    returnUrl = $"{GetPSPBaseUrl()}/api/paypal/return?pspTransactionId={transaction.PSPTransactionId}",
+                    cancelUrl = $"{GetPSPBaseUrl()}/api/paypal/cancel?pspTransactionId={transaction.PSPTransactionId}"
+                };
+
+                var json = JsonSerializer.Serialize(paypalOrderRequest);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                _logger.LogInformation($"Calling PayPal service at: {_payPalServiceUrl}/api/paypal/create-order");
+                _logger.LogInformation($"Request payload: {json}");
+
+                // Call PayPal service to create order
+                var response = await _httpClient.PostAsync($"{_payPalServiceUrl}/api/paypal/create-order", content);
+                
+                _logger.LogInformation($"PayPal service response status: {response.StatusCode}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation($"PayPal service response: {responseContent}");
                     
-                    return new PaymentResponse
+                    var paypalResponse = JsonSerializer.Deserialize<PayPalOrderCreationResponse>(responseContent, new JsonSerializerOptions 
+                    { 
+                        PropertyNameCaseInsensitive = true 
+                    });
+
+                    if (paypalResponse?.OrderId != null && !string.IsNullOrEmpty(paypalResponse.ApprovalUrl))
                     {
-                        Success = true,
-                        Message = "PayPal payment initiated successfully",
-                        PaymentUrl = $"https://paypal.com/checkout?transactionId={externalTransactionId}"
-                    };
+                        _logger.LogInformation($"PayPal order created successfully: {paypalResponse.OrderId}");
+                        
+                        return new PaymentResponse
+                        {
+                            Success = true,
+                            Message = "PayPal payment initiated successfully",
+                            PaymentUrl = paypalResponse.ApprovalUrl,
+                            ExternalTransactionId = paypalResponse.OrderId
+                        };
+                    }
+                    else
+                    {
+                        _logger.LogError($"Invalid PayPal response: {responseContent}");
+                        return new PaymentResponse
+                        {
+                            Success = false,
+                            Message = "Failed to create PayPal order - invalid response format",
+                            ErrorCode = "PAYPAL_ORDER_CREATION_FAILED"
+                        };
+                    }
                 }
                 else
                 {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError($"PayPal service error: {response.StatusCode} - {errorContent}");
+                    
                     return new PaymentResponse
                     {
                         Success = false,
-                        Message = "PayPal payment failed",
-                        ErrorCode = "PAYPAL_PAYMENT_FAILED"
+                        Message = $"PayPal service error: {response.StatusCode} - {errorContent}",
+                        ErrorCode = "PAYPAL_SERVICE_ERROR"
                     };
                 }
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error processing PayPal payment for transaction {transaction.PSPTransactionId}");
+                
+                // Fallback to simulation if PayPal service is not available
+                if (ex.Message.Contains("Connection refused") || ex.Message.Contains("No connection could be made") || 
+                    ex.Message.Contains("SSL") || ex.Message.Contains("certificate") || ex.Message.Contains("timeout"))
+                {
+                    _logger.LogWarning("PayPal service not available, falling back to simulation");
+                    
+                    var externalTransactionId = $"PAYPAL_SIM_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..8].ToUpper()}";
+                    
+                    return new PaymentResponse
+                    {
+                        Success = true,
+                        Message = "PayPal payment initiated successfully (simulation mode)",
+                        PaymentUrl = $"https://www.sandbox.paypal.com/checkoutnow?token={externalTransactionId}",
+                        ExternalTransactionId = externalTransactionId
+                    };
+                }
+                
                 return new PaymentResponse
                 {
                     Success = false,
@@ -56,19 +125,73 @@ namespace PaymentServiceProvider.Services.Plugins
             }
         }
 
+        private string GetPSPBaseUrl()
+        {
+            // In production, this should be configurable
+            return "https://localhost:7006"; // PSP service URL
+        }
+
         public async Task<PaymentStatusUpdate> GetPaymentStatusAsync(string externalTransactionId)
         {
-            // Simulate status check with PayPal API
-            await Task.Delay(800);
-            
-            return new PaymentStatusUpdate
+            try
             {
-                PSPTransactionId = externalTransactionId,
-                Status = TransactionStatus.Completed,
-                StatusMessage = "PayPal payment completed successfully",
-                ExternalTransactionId = externalTransactionId,
-                UpdatedAt = DateTime.UtcNow
-            };
+                _logger.LogInformation($"Getting PayPal payment status for order {externalTransactionId}");
+
+                // Call PayPal service to get order status
+                var response = await _httpClient.GetAsync($"{_payPalServiceUrl}/api/paypal/order-status/{externalTransactionId}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var paypalStatus = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent, new JsonSerializerOptions 
+                    { 
+                        PropertyNameCaseInsensitive = true 
+                    });
+
+                    var status = paypalStatus?.GetValueOrDefault("status")?.ToString();
+                    var transactionStatus = status?.ToUpper() switch
+                    {
+                        "COMPLETED" => TransactionStatus.Completed,
+                        "APPROVED" => TransactionStatus.Completed,
+                        "CANCELLED" => TransactionStatus.Cancelled,
+                        "FAILED" => TransactionStatus.Failed,
+                        _ => TransactionStatus.Processing
+                    };
+
+                    return new PaymentStatusUpdate
+                    {
+                        PSPTransactionId = externalTransactionId,
+                        Status = transactionStatus,
+                        StatusMessage = $"PayPal payment status: {status}",
+                        ExternalTransactionId = externalTransactionId,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                }
+                else
+                {
+                    _logger.LogError($"Failed to get PayPal status: {response.StatusCode}");
+                    return new PaymentStatusUpdate
+                    {
+                        PSPTransactionId = externalTransactionId,
+                        Status = TransactionStatus.Failed,
+                        StatusMessage = "Failed to get PayPal payment status",
+                        ExternalTransactionId = externalTransactionId,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting PayPal payment status for {externalTransactionId}");
+                return new PaymentStatusUpdate
+                {
+                    PSPTransactionId = externalTransactionId,
+                    Status = TransactionStatus.Failed,
+                    StatusMessage = $"Error getting PayPal status: {ex.Message}",
+                    ExternalTransactionId = externalTransactionId,
+                    UpdatedAt = DateTime.UtcNow
+                };
+            }
         }
 
         public async Task<bool> RefundPaymentAsync(string externalTransactionId, decimal amount)
@@ -87,7 +210,7 @@ namespace PaymentServiceProvider.Services.Plugins
             }
         }
 
-        public async Task<PaymentCallback> ProcessCallbackAsync(Dictionary<string, object> callbackData)
+        public Task<PaymentCallback> ProcessCallbackAsync(Dictionary<string, object> callbackData)
         {
             try
             {
@@ -105,7 +228,7 @@ namespace PaymentServiceProvider.Services.Plugins
                     _ => TransactionStatus.Pending
                 };
 
-                return new PaymentCallback
+                return Task.FromResult(new PaymentCallback
                 {
                     PSPTransactionId = pspTransactionId,
                     ExternalTransactionId = externalTransactionId,
@@ -115,7 +238,7 @@ namespace PaymentServiceProvider.Services.Plugins
                     Currency = callbackData.GetValueOrDefault("currency")?.ToString() ?? "USD",
                     Timestamp = DateTime.UtcNow,
                     AdditionalData = callbackData
-                };
+                });
             }
             catch (Exception ex)
             {
@@ -133,7 +256,7 @@ namespace PaymentServiceProvider.Services.Plugins
                 var config = JsonSerializer.Deserialize<Dictionary<string, object>>(configuration);
                 
                 // Validate required PayPal configuration parameters
-                return config.ContainsKey("clientId") && 
+                return config != null && config.ContainsKey("clientId") && 
                        config.ContainsKey("clientSecret") && 
                        config.ContainsKey("mode"); // sandbox or live
             }

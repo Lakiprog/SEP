@@ -23,6 +23,7 @@ namespace PaymentServiceProvider.Models
         public string? PaymentUrl { get; set; }
         public string? Message { get; set; }
         public string? ErrorCode { get; set; }
+        public string? ExternalTransactionId { get; set; }
         public List<PaymentMethod>? AvailablePaymentMethods { get; set; }
     }
 
