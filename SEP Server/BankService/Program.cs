@@ -85,19 +85,22 @@ lifetime.ApplicationStarted.Register(async () =>
             ID = "bank-service-1",
             Name = "bank-service",
             Address = "localhost",
-            Port = 7004,
+            Port = 7001,
             Tags = new[] { "payment", "bank", "internal" },
             Check = new AgentServiceCheck
             {
-                HTTP = "https://localhost:7004/health",
+                HTTP = "http://localhost:7000/health",
                 Interval = TimeSpan.FromSeconds(10),
                 Timeout = TimeSpan.FromSeconds(5),
-                DeregisterCriticalServiceAfter = TimeSpan.FromMinutes(1)
+                DeregisterCriticalServiceAfter = TimeSpan.FromMinutes(5)
             }
         };
 
         await consulClient.Agent.ServiceRegister(registration);
         Console.WriteLine("Bank Service registered with Consul");
+        Console.WriteLine($"Service ID: {registration.ID}");
+        Console.WriteLine($"Service Name: {registration.Name}");
+        Console.WriteLine($"Health Check URL: {registration.Check.HTTP}");
     }
     catch (Exception ex)
     {

@@ -1,28 +1,83 @@
 ﻿{
   "Routes": [
     {
-      "DownstreamPathTemplate": "/api/CardPayment/payment",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [
-        {
-          "Host": "localhost",
-          "Port": 5049
-        }
-      ],
-      "UpstreamPathTemplate": "/card-payment",
-      "UpstreamHttpMethod": [ "Get" ]
+      "DownstreamPathTemplate": "/api/psp/payment/create",
+      "DownstreamScheme": "https",
+      "ServiceName": "payment-service-provider",
+      "UpstreamPathTemplate": "/api/psp/payment/create",
+      "UpstreamHttpMethod": [ "POST" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
     },
     {
-      "DownstreamPathTemplate": "/api/PaymentService/",
-      "DownstreamScheme": "http",
+      "DownstreamPathTemplate": "/api/psp/payment/{pspTransactionId}/process",
+      "DownstreamScheme": "https",
+      "ServiceName": "payment-service-provider",
+      "UpstreamPathTemplate": "/api/psp/payment/{pspTransactionId}/process",
+      "UpstreamHttpMethod": [ "POST" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
+    },
+    {
+      "DownstreamPathTemplate": "/api/psp/payment/{pspTransactionId}/status",
+      "DownstreamScheme": "https",
+      "ServiceName": "payment-service-provider",
+      "UpstreamPathTemplate": "/api/psp/payment/{pspTransactionId}/status",
+      "UpstreamHttpMethod": [ "GET" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
+    },
+    {
+      "DownstreamPathTemplate": "/api/psp/payment-methods",
+      "DownstreamScheme": "https",
+      "ServiceName": "payment-service-provider",
+      "UpstreamPathTemplate": "/api/psp/payment-methods",
+      "UpstreamHttpMethod": [ "GET" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
+    },
+    {
+      "DownstreamPathTemplate": "/api/psp/callback",
+      "DownstreamScheme": "https",
+      "ServiceName": "payment-service-provider",
+      "UpstreamPathTemplate": "/api/psp/callback",
+      "UpstreamHttpMethod": [ "POST" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
+    },
+    {
+      "DownstreamPathTemplate": "/api/psp/transactions",
+      "DownstreamScheme": "https",
+      "ServiceName": "payment-service-provider",
+      "UpstreamPathTemplate": "/api/psp/transactions",
+      "UpstreamHttpMethod": [ "GET" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
+    },
+    {
+      "DownstreamPathTemplate": "/api/PackageDeal/payment/initiate-psp",
+      "DownstreamScheme": "https",
       "DownstreamHostAndPorts": [
         {
           "Host": "localhost",
-          "Port": 5248
+          "Port": 7010
         }
       ],
-      "UpstreamPathTemplate": "/payment-methods",
-      "UpstreamHttpMethod": [ "Get" ]
+      "UpstreamPathTemplate": "/api/PackageDeal/payment/initiate-psp",
+      "UpstreamHttpMethod": [ "POST" ]
     }
-  ]
+  ],
+  "GlobalConfiguration": {
+    "ServiceDiscoveryProvider": {
+      "Host": "localhost",
+      "Port": 8500,
+      "Type": "Consul"
+    }
+  }
 }

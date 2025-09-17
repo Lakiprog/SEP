@@ -99,8 +99,8 @@ const PSPCardPaymentForm = ({ selectedPackage, years, onPay, onCancel }) => {
 
       console.log('Creating PSP payment request:', paymentRequest);
 
-      // Create payment in PSP
-      const createResponse = await axios.post('https://localhost:7006/api/psp/payment/create', paymentRequest);
+      // Create payment via Gateway
+      const createResponse = await axios.post('https://localhost:5001/api/psp/payment/create', paymentRequest);
       
       console.log('PSP Create Response:', createResponse.data);
       
@@ -124,8 +124,8 @@ const PSPCardPaymentForm = ({ selectedPackage, years, onPay, onCancel }) => {
 
       console.log('Processing PSP payment through BankService:', processRequest);
 
-      // PSP will route this payment to BankService for processing
-      const processResponse = await axios.post(`https://localhost:7006/api/psp/payment/${paymentId}/process`, processRequest);
+      // PSP will route this payment to BankService for processing (via Gateway)
+      const processResponse = await axios.post(`https://localhost:5001/api/psp/payment/${paymentId}/process`, processRequest);
       
       if (!processResponse.data.success) {
         throw new Error(processResponse.data.message || 'Payment processing failed');

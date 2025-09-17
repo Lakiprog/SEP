@@ -4,6 +4,7 @@
     {
         public int Id { get; set; }
         public string PaymentId { get; set; } = string.Empty;
+        public string? PSPTransactionId { get; set; } // PSP Transaction ID for callback
         public DateTime MerchantTimestamp { get; set; }
         public string MerchantOrderId { get; set; } = string.Empty;
         public string AcquirerOrderId { get; set; } = string.Empty;

@@ -1,5 +1,6 @@
 using PaymentServiceProvider.Interfaces;
 using PaymentServiceProvider.Models;
+using PaymentServiceProvider.Services;
 using System.Text.Json;
 using System.Text;
 
@@ -8,12 +9,14 @@ namespace PaymentServiceProvider.Services.Plugins
     public class CardPaymentPlugin : IPaymentPlugin
     {
         private readonly HttpClient _httpClient;
-        private readonly string _bankServiceUrl;
+        private readonly IServiceDiscoveryClient _serviceDiscovery;
+        private readonly string _fallbackUrl;
 
-        public CardPaymentPlugin(HttpClient httpClient)
+        public CardPaymentPlugin(HttpClient httpClient, IServiceDiscoveryClient serviceDiscovery)
         {
             _httpClient = httpClient;
-            _bankServiceUrl = "https://localhost:7001"; // BankService URL
+            _serviceDiscovery = serviceDiscovery;
+            _fallbackUrl = "https://localhost:7004"; // BankService URL (correct port)
         }
 
         public string Name => "Credit/Debit Card";
@@ -24,6 +27,9 @@ namespace PaymentServiceProvider.Services.Plugins
         {
             try
             {
+                // Get Bank service URL from Consul
+                var bankServiceUrl = await _serviceDiscovery.GetServiceUrlAsync("bank-service") ?? _fallbackUrl;
+
                 // Generate redirect URL to bank React application card payment page
                 // Pass transaction details as query parameters
                 var bankFrontendUrl = "http://localhost:3002"; // Bank React app URL
@@ -34,10 +40,12 @@ namespace PaymentServiceProvider.Services.Plugins
                     $"&orderId={transaction.MerchantOrderId}" +
                     $"&pspTransactionId={transaction.PSPTransactionId}" +
                     $"&returnUrl={request.ReturnURL}" +
-                    $"&cancelUrl={request.CancelURL}";
-                
+                    $"&cancelUrl={request.CancelURL}" +
+                    $"&bankServiceUrl={Uri.EscapeDataString(bankServiceUrl)}";
+
                 Console.WriteLine($"[DEBUG] Card Payment Plugin redirecting to: {bankCardUrl}");
-                
+                Console.WriteLine($"[DEBUG] Bank service discovered at: {bankServiceUrl}");
+
                 return new PaymentResponse
                 {
                     Success = true,
@@ -59,17 +67,72 @@ namespace PaymentServiceProvider.Services.Plugins
 
         public async Task<PaymentStatusUpdate> GetPaymentStatusAsync(string externalTransactionId)
         {
-            // Simulate status check
-            await Task.Delay(500);
-            
-            return new PaymentStatusUpdate
+            try
             {
-                PSPTransactionId = externalTransactionId,
-                Status = TransactionStatus.Completed,
-                StatusMessage = "Payment completed successfully",
-                ExternalTransactionId = externalTransactionId,
-                UpdatedAt = DateTime.UtcNow
-            };
+                // Get Bank service URL from Consul
+                var bankServiceUrl = await _serviceDiscovery.GetServiceUrlAsync("bank-service") ?? _fallbackUrl;
+
+                // Call Bank service to get transaction status
+                var response = await _httpClient.GetAsync($"{bankServiceUrl}/api/bank/transaction-status/{externalTransactionId}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var statusResponse = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    var status = statusResponse?.GetValueOrDefault("status")?.ToString();
+                    var transactionStatus = status?.ToUpper() switch
+                    {
+                        "COMPLETED" => TransactionStatus.Completed,
+                        "SUCCESS" => TransactionStatus.Completed,
+                        "FAILED" => TransactionStatus.Failed,
+                        "CANCELLED" => TransactionStatus.Cancelled,
+                        _ => TransactionStatus.Processing
+                    };
+
+                    return new PaymentStatusUpdate
+                    {
+                        PSPTransactionId = externalTransactionId,
+                        Status = transactionStatus,
+                        StatusMessage = $"Bank payment status: {status}",
+                        ExternalTransactionId = externalTransactionId,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                }
+                else
+                {
+                    // Fallback to simulation if Bank service is not available
+                    await Task.Delay(500);
+
+                    return new PaymentStatusUpdate
+                    {
+                        PSPTransactionId = externalTransactionId,
+                        Status = TransactionStatus.Completed,
+                        StatusMessage = "Payment completed successfully (fallback)",
+                        ExternalTransactionId = externalTransactionId,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Failed to get status from Bank service: {ex.Message}");
+
+                // Fallback to simulation
+                await Task.Delay(500);
+
+                return new PaymentStatusUpdate
+                {
+                    PSPTransactionId = externalTransactionId,
+                    Status = TransactionStatus.Completed,
+                    StatusMessage = "Payment completed successfully (fallback)",
+                    ExternalTransactionId = externalTransactionId,
+                    UpdatedAt = DateTime.UtcNow
+                };
+            }
         }
 
         public async Task<bool> RefundPaymentAsync(string externalTransactionId, decimal amount)

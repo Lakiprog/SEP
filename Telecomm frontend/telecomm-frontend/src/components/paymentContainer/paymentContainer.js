@@ -46,7 +46,7 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
 
       // Call Gateway service directly (not through Telecom to avoid circular calls)
       console.log('Sending payment request:', paymentData);
-      const response = await axios.post('https://localhost:5001/api/Payment/packagedeal/payment/initiate', paymentData);
+      const response = await axios.post('https://localhost:5001/api/PackageDeal/payment/initiate-psp', paymentData);
       console.log('Payment response:', response.data);
       if (response.data.success) {
         setLoading(false);

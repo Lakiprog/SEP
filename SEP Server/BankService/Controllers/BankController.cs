@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using BankService.Models;
 using BankService.Interfaces;
 using BankService.Services;
+using Consul;
 
 namespace BankService.Controllers
 {
@@ -101,8 +103,10 @@ namespace BankService.Controllers
                     request.OrderId ?? Guid.NewGuid().ToString()
                 );
 
-                // Create payment transaction record
-                var paymentId = Guid.NewGuid().ToString();
+                // Use PSP Transaction ID as payment ID, or generate new one if not provided
+                var paymentId = !string.IsNullOrEmpty(request.PSPTransactionId)
+                    ? request.PSPTransactionId
+                    : Guid.NewGuid().ToString();
                 
                 // Get the first merchant and user from database (or use specific ones)
                 var merchants = await _merchantRepository.GetAll();
@@ -249,12 +253,31 @@ namespace BankService.Controllers
                 {
                     trackedTransaction.Status = transactionResult.Success ? "SUCCESS" : "FAILED";
                     trackedTransaction.ProcessedAt = DateTime.UtcNow;
+
+                    // Save PSP Transaction ID if provided
+                    if (!string.IsNullOrEmpty(request.PSPTransactionId))
+                    {
+                        trackedTransaction.PSPTransactionId = request.PSPTransactionId;
+                    }
+
                     await _bankTransactionRepository.UpdateAsync(trackedTransaction);
                 }
 
                 Console.WriteLine($"[DEBUG] Transaction result: Success={transactionResult.Success}, Message={transactionResult.Message}");
 
-                return Ok(new { 
+                // Send callback to PSP to update transaction status
+                if (transactionResult.Success)
+                {
+                    var pspTransactionId = !string.IsNullOrEmpty(request.PSPTransactionId) ? request.PSPTransactionId : request.PAYMENT_ID;
+                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(pspTransactionId, "SUCCESS", request.Amount, "CARD"));
+                }
+                else
+                {
+                    var pspTransactionId = !string.IsNullOrEmpty(request.PSPTransactionId) ? request.PSPTransactionId : request.PAYMENT_ID;
+                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(pspTransactionId, "FAILED", request.Amount, "CARD"));
+                }
+
+                return Ok(new {
                     success = transactionResult.Success,
                     message = transactionResult.Message,
                     transactionId = transactionResult.TransactionId
@@ -302,9 +325,31 @@ namespace BankService.Controllers
 
                 // Deduct amount from account (simulate internal transfer)
                 bankAccount.Balance -= request.Amount;
-                
-                // Update the account in database
-                await _bankAccountRepository.UpdateAsync(bankAccount);
+
+                // Update the account in database - reload to avoid concurrency issues
+                try
+                {
+                    await _bankAccountRepository.UpdateAsync(bankAccount);
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // Reload the account and try again
+                    Console.WriteLine($"[DEBUG] Concurrency exception, reloading account and retrying");
+                    var reloadedAccount = await _bankAccountRepository.GetAccountByCardNumber(request.PAN);
+                    if (reloadedAccount == null || reloadedAccount.Balance < request.Amount)
+                    {
+                        return new TransactionResult
+                        {
+                            Success = false,
+                            TransactionId = Guid.NewGuid().ToString(),
+                            Message = "Account not found or insufficient funds after reload"
+                        };
+                    }
+
+                    reloadedAccount.Balance -= request.Amount;
+                    await _bankAccountRepository.UpdateAsync(reloadedAccount);
+                    bankAccount = reloadedAccount; // Update reference for logging
+                }
 
                 var transactionId = Guid.NewGuid().ToString();
                 Console.WriteLine($"[DEBUG] Internal transaction successful. Transaction ID: {transactionId}, New balance: {bankAccount.Balance}");
@@ -445,6 +490,17 @@ namespace BankService.Controllers
 
                 Console.WriteLine($"[BANK DEBUG] Issuer processing result: Success={transactionResult.Success}, Message={transactionResult.Message}");
 
+                // Send callback to PSP to update transaction status
+                // For PCC issuer requests, the AcquirerOrderId is the PSP Transaction ID
+                if (transactionResult.Success)
+                {
+                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(request.AcquirerOrderId, "SUCCESS", request.Amount, "CARD"));
+                }
+                else
+                {
+                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(request.AcquirerOrderId, "FAILED", request.Amount, "CARD"));
+                }
+
                 // Return response to PCC
                 return Ok(new PaymentCardCenterService.Dto.IssuerBankResponse
                 {
@@ -541,7 +597,7 @@ namespace BankService.Controllers
                 // Send callback to PSP if transaction is successful
                 if (isSuccess)
                 {
-                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(transaction.PaymentId, "SUCCESS"));
+                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(transaction.PaymentId, "SUCCESS", transaction.Amount));
                 }
 
                 var result = new
@@ -577,20 +633,42 @@ namespace BankService.Controllers
             }
         }
 
-        private async Task NotifyPSPOfTransactionStatus(string paymentId, string status)
+        private async Task NotifyPSPOfTransactionStatus(string paymentId, string status, decimal amount, string paymentType = "QR")
         {
             try
             {
                 using var httpClient = new HttpClient();
-                var pspCallbackUrl = "https://localhost:7006/api/psp/callback"; // PSP callback endpoint
-                
+
+                // Create Consul client directly since HttpContext is not available in Task.Run
+                var consulConfig = new ConsulClientConfiguration
+                {
+                    Address = new Uri("http://localhost:8500")
+                };
+                using var consulClient = new ConsulClient(consulConfig);
+
+                var pspServiceUrl = await GetServiceUrlFromConsulStatic(consulClient, paymentId);
+                var pspCallbackUrl = $"{pspServiceUrl}/api/psp/callback";
+
                 var callbackData = new
                 {
-                    transactionId = paymentId,
-                    status = status,
-                    timestamp = DateTime.UtcNow,
-                    source = "BANK_QR_PAYMENT"
+                    PSPTransactionId = paymentId,
+                    ExternalTransactionId = paymentId,
+                    Status = status == "SUCCESS" ? 2 : 3, // 2 = Completed, 3 = Failed (enum values)
+                    StatusMessage = status == "SUCCESS" ?
+                        (paymentType == "CARD" ? "Card payment completed successfully" : "QR payment completed successfully") :
+                        (paymentType == "CARD" ? "Card payment failed" : "QR payment failed"),
+                    Amount = amount,
+                    Currency = "RSD",
+                    Timestamp = DateTime.UtcNow,
+                    AdditionalData = new Dictionary<string, object>
+                    {
+                        { "source", paymentType == "CARD" ? "BANK_CARD_PAYMENT" : "BANK_QR_PAYMENT" },
+                        { "originalTransactionId", paymentId },
+                        { "paymentType", paymentType }
+                    }
                 };
+
+                Console.WriteLine($"[BANK] Sending callback data: {System.Text.Json.JsonSerializer.Serialize(callbackData)}");
 
                 var json = System.Text.Json.JsonSerializer.Serialize(callbackData);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
@@ -599,16 +677,64 @@ namespace BankService.Controllers
                 
                 if (response.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation($"Successfully notified PSP of transaction {paymentId} status: {status}");
+                    Console.WriteLine($"Successfully notified PSP of transaction {paymentId} status: {status}");
                 }
                 else
                 {
-                    _logger.LogWarning($"Failed to notify PSP of transaction {paymentId} status. Response: {response.StatusCode}");
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Failed to notify PSP of transaction {paymentId} status. Response: {response.StatusCode}");
+                    Console.WriteLine($"Error details: {errorContent}");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error notifying PSP of transaction {paymentId} status");
+                Console.WriteLine($"Error notifying PSP of transaction {paymentId} status: {ex.Message}");
+            }
+        }
+
+        private async Task<string> GetServiceUrlFromConsulStatic(IConsulClient consulClient, string paymentId)
+        {
+            try
+            {
+                var services = await consulClient.Health.Service("payment-service-provider", "", true);
+                if (services.Response.Any())
+                {
+                    var service = services.Response.First().Service;
+                    var url = $"https://{service.Address}:{service.Port}";
+                    Console.WriteLine($"Found PSP service at {url} for transaction {paymentId}");
+                    return url;
+                }
+
+                Console.WriteLine($"No healthy PSP instances found for transaction {paymentId}, using fallback");
+                return "https://localhost:7006"; // Fallback to hardcoded PSP URL
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error discovering PSP service for transaction {paymentId}, using fallback: {ex.Message}");
+                return "https://localhost:7006"; // Fallback to hardcoded PSP URL
+            }
+        }
+
+        private async Task<string> GetServiceUrlFromConsul(IConsulClient consulClient, string serviceName)
+        {
+            try
+            {
+                var services = await consulClient.Health.Service(serviceName, "", true);
+                if (services.Response.Any())
+                {
+                    var service = services.Response.First().Service;
+                    var url = $"https://{service.Address}:{service.Port}";
+                    _logger.LogInformation($"Found service {serviceName} at {url}");
+                    return url;
+                }
+
+                _logger.LogWarning($"No healthy instances found for service {serviceName}, using fallback");
+                return "https://localhost:7006"; // Fallback to hardcoded PSP URL
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error discovering service {serviceName}, using fallback");
+                return "https://localhost:7006"; // Fallback to hardcoded PSP URL
             }
         }
 
@@ -852,6 +978,7 @@ namespace BankService.Controllers
         public string OrderId { get; set; } = string.Empty;
         public string AccountNumber { get; set; } = string.Empty;
         public string ReceiverName { get; set; } = string.Empty;
+        public string? PSPTransactionId { get; set; } // PSP Transaction ID from frontend
     }
 
     public class QRValidationRequest
@@ -867,6 +994,7 @@ namespace BankService.Controllers
         public string ExpiryDate { get; set; } = string.Empty;
         public string PAYMENT_ID { get; set; } = string.Empty;
         public decimal Amount { get; set; }
+        public string? PSPTransactionId { get; set; } // PSP Transaction ID for callback
     }
 
     public class TransactionResult

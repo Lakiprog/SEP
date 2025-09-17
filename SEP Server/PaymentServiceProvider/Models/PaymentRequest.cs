@@ -20,7 +20,9 @@ namespace PaymentServiceProvider.Models
     {
         public bool Success { get; set; }
         public string? PSPTransactionId { get; set; }
+        public string? TransactionId { get; set; } // Duplicate for compatibility
         public string? PaymentUrl { get; set; }
+        public string? PaymentSelectionUrl { get; set; } // URL for payment method selection
         public string? Message { get; set; }
         public string? ErrorCode { get; set; }
         public string? ExternalTransactionId { get; set; }

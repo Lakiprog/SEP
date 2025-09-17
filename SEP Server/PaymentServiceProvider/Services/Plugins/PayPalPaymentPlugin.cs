@@ -1,5 +1,6 @@
 using PaymentServiceProvider.Interfaces;
 using PaymentServiceProvider.Models;
+using PaymentServiceProvider.Services;
 using System.Text.Json;
 
 namespace PaymentServiceProvider.Services.Plugins
@@ -8,13 +9,15 @@ namespace PaymentServiceProvider.Services.Plugins
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<PayPalPaymentPlugin> _logger;
-        private readonly string _payPalServiceUrl;
+        private readonly IServiceDiscoveryClient _serviceDiscovery;
+        private readonly string _fallbackUrl;
 
-        public PayPalPaymentPlugin(HttpClient httpClient, ILogger<PayPalPaymentPlugin> logger, IConfiguration configuration)
+        public PayPalPaymentPlugin(HttpClient httpClient, ILogger<PayPalPaymentPlugin> logger, IConfiguration configuration, IServiceDiscoveryClient serviceDiscovery)
         {
             _httpClient = httpClient;
             _logger = logger;
-            _payPalServiceUrl = configuration.GetConnectionString("PayPalService") ?? "https://localhost:7008";
+            _serviceDiscovery = serviceDiscovery;
+            _fallbackUrl = configuration.GetConnectionString("PayPalService") ?? "https://localhost:7008";
         }
 
         public string Name => "PayPal";
@@ -26,6 +29,9 @@ namespace PaymentServiceProvider.Services.Plugins
             try
             {
                 _logger.LogInformation($"Processing PayPal payment for transaction {transaction.PSPTransactionId}");
+
+                // Get PayPal service URL from Consul
+                var payPalServiceUrl = await _serviceDiscovery.GetServiceUrlAsync("paypal-payment-service") ?? _fallbackUrl;
 
                 // Create PayPal order request
                 var paypalOrderRequest = new
@@ -41,11 +47,11 @@ namespace PaymentServiceProvider.Services.Plugins
                 var json = JsonSerializer.Serialize(paypalOrderRequest);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-                _logger.LogInformation($"Calling PayPal service at: {_payPalServiceUrl}/api/paypal/create-order");
+                _logger.LogInformation($"Calling PayPal service at: {payPalServiceUrl}/api/paypal/create-order");
                 _logger.LogInformation($"Request payload: {json}");
 
                 // Call PayPal service to create order
-                var response = await _httpClient.PostAsync($"{_payPalServiceUrl}/api/paypal/create-order", content);
+                var response = await _httpClient.PostAsync($"{payPalServiceUrl}/api/paypal/create-order", content);
                 
                 _logger.LogInformation($"PayPal service response status: {response.StatusCode}");
                 
@@ -137,8 +143,11 @@ namespace PaymentServiceProvider.Services.Plugins
             {
                 _logger.LogInformation($"Getting PayPal payment status for order {externalTransactionId}");
 
+                // Get PayPal service URL from Consul
+                var payPalServiceUrl = await _serviceDiscovery.GetServiceUrlAsync("paypal-payment-service") ?? _fallbackUrl;
+
                 // Call PayPal service to get order status
-                var response = await _httpClient.GetAsync($"{_payPalServiceUrl}/api/paypal/order-status/{externalTransactionId}");
+                var response = await _httpClient.GetAsync($"{payPalServiceUrl}/api/paypal/order-status/{externalTransactionId}");
                 
                 if (response.IsSuccessStatusCode)
                 {
