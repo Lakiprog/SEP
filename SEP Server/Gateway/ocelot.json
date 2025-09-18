@@ -1,67 +1,19 @@
 ﻿{
   "Routes": [
+    // PSP Service Routes
     {
-      "DownstreamPathTemplate": "/api/psp/payment/create",
+      "DownstreamPathTemplate": "/api/psp/{everything}",
       "DownstreamScheme": "https",
       "ServiceName": "payment-service-provider",
-      "UpstreamPathTemplate": "/api/psp/payment/create",
-      "UpstreamHttpMethod": [ "POST" ],
+      "UpstreamPathTemplate": "/api/psp/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
       "LoadBalancerOptions": {
         "Type": "RoundRobin"
       }
     },
+    // Telecom Service Routes
     {
-      "DownstreamPathTemplate": "/api/psp/payment/{pspTransactionId}/process",
-      "DownstreamScheme": "https",
-      "ServiceName": "payment-service-provider",
-      "UpstreamPathTemplate": "/api/psp/payment/{pspTransactionId}/process",
-      "UpstreamHttpMethod": [ "POST" ],
-      "LoadBalancerOptions": {
-        "Type": "RoundRobin"
-      }
-    },
-    {
-      "DownstreamPathTemplate": "/api/psp/payment/{pspTransactionId}/status",
-      "DownstreamScheme": "https",
-      "ServiceName": "payment-service-provider",
-      "UpstreamPathTemplate": "/api/psp/payment/{pspTransactionId}/status",
-      "UpstreamHttpMethod": [ "GET" ],
-      "LoadBalancerOptions": {
-        "Type": "RoundRobin"
-      }
-    },
-    {
-      "DownstreamPathTemplate": "/api/psp/payment-methods",
-      "DownstreamScheme": "https",
-      "ServiceName": "payment-service-provider",
-      "UpstreamPathTemplate": "/api/psp/payment-methods",
-      "UpstreamHttpMethod": [ "GET" ],
-      "LoadBalancerOptions": {
-        "Type": "RoundRobin"
-      }
-    },
-    {
-      "DownstreamPathTemplate": "/api/psp/callback",
-      "DownstreamScheme": "https",
-      "ServiceName": "payment-service-provider",
-      "UpstreamPathTemplate": "/api/psp/callback",
-      "UpstreamHttpMethod": [ "POST" ],
-      "LoadBalancerOptions": {
-        "Type": "RoundRobin"
-      }
-    },
-    {
-      "DownstreamPathTemplate": "/api/psp/transactions",
-      "DownstreamScheme": "https",
-      "ServiceName": "payment-service-provider",
-      "UpstreamPathTemplate": "/api/psp/transactions",
-      "UpstreamHttpMethod": [ "GET" ],
-      "LoadBalancerOptions": {
-        "Type": "RoundRobin"
-      }
-    },
-    {
-      "DownstreamPathTemplate": "/api/PackageDeal/payment/initiate-psp",
+      "DownstreamPathTemplate": "/api/{everything}",
       "DownstreamScheme": "https",
       "DownstreamHostAndPorts": [
         {
@@ -69,8 +21,75 @@
           "Port": 7010
         }
       ],
-      "UpstreamPathTemplate": "/api/PackageDeal/payment/initiate-psp",
-      "UpstreamHttpMethod": [ "POST" ]
+      "UpstreamPathTemplate": "/api/telecom/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
+    },
+    // Bank Service Routes  
+    {
+      "DownstreamPathTemplate": "/api/bank/{everything}",
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost", 
+          "Port": 7001
+        }
+      ],
+      "UpstreamPathTemplate": "/api/bank/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
+    },
+    // PayPal Service Routes
+    {
+      "DownstreamPathTemplate": "/api/paypal/{everything}",
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 7003
+        }
+      ],
+      "UpstreamPathTemplate": "/api/paypal/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
+    },
+    // Bitcoin Service Routes
+    {
+      "DownstreamPathTemplate": "/api/bitcoin/{everything}",
+      "DownstreamScheme": "https", 
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 7004
+        }
+      ],
+      "UpstreamPathTemplate": "/api/bitcoin/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
+    },
+    // Payment Card Center Routes
+    {
+      "DownstreamPathTemplate": "/api/pcc/{everything}",
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 7004
+        }
+      ],
+      "UpstreamPathTemplate": "/api/pcc/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "LoadBalancerOptions": {
+        "Type": "RoundRobin"
+      }
     }
   ],
   "GlobalConfiguration": {

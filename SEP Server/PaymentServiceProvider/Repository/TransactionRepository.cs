@@ -16,5 +16,20 @@ namespace PaymentServiceProvider.Repository
                 .Include(t => t.PaymentType)
                 .FirstOrDefaultAsync(t => t.PSPTransactionId == pspTransactionId);
         }
+
+        public async Task<Transaction> GetByMerchantOrderId(string merchantOrderId)
+        {
+            // Try to parse as GUID first
+            if (Guid.TryParse(merchantOrderId, out var guidValue))
+            {
+                return await _context.Transactions
+                    .Include(t => t.WebShopClient)
+                    .Include(t => t.PaymentType)
+                    .FirstOrDefaultAsync(t => t.MerchantOrderId == guidValue);
+            }
+            
+            // If not a valid GUID, return null
+            return null;
+        }
     }
 }

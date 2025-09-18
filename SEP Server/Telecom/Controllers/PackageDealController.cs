@@ -181,6 +181,33 @@ namespace Telecom.Controllers
             }
         }
 
+        [HttpPost("payment/callback")]
+        public async Task<IActionResult> HandlePaymentCallback([FromBody] PaymentCallbackRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"[TELECOM] Payment callback received: TransactionId={request.TransactionId}, Status={request.Status}");
+                
+                if (request.Status == "Completed")
+                {
+                    // Extract data from Description to create subscription
+                    var subscription = await _packageDealService.CreateSubscriptionFromPayment(request);
+                    _logger.LogInformation($"[TELECOM] Subscription created: {subscription.Id}");
+                    return Ok(new { success = true, subscriptionId = subscription.Id });
+                }
+                else
+                {
+                    _logger.LogWarning($"[TELECOM] Payment failed: {request.TransactionId}");
+                    return Ok(new { success = false, message = "Payment failed" });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling payment callback");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
         [HttpPost("payment-completed")]
         public async Task<IActionResult> HandlePaymentCompleted([FromBody] PaymentCompletedRequest request)
         {

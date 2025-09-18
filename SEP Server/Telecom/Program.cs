@@ -26,6 +26,7 @@ builder.Services.AddCors(options =>
 // Register services
 builder.Services.AddScoped<IPackageDealService, PackageDealService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 
 
 var app = builder.Build();

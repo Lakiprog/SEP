@@ -130,7 +130,7 @@ namespace Telecom.Services
                     MerchantPassword = "telecom123",
                     Amount = request.Amount,
                     Currency = request.Currency,
-                    MerchantOrderId = Guid.NewGuid(),
+                    MerchantOrderId = !string.IsNullOrEmpty(request.TransactionId) ? Guid.Parse(request.TransactionId) : Guid.NewGuid(),
                     Description = request.Description,
                     CustomerEmail = $"user{request.UserId}@telecom.com", // Mock email
                     CustomerName = $"User {request.UserId}", // Mock name
@@ -139,7 +139,7 @@ namespace Telecom.Services
                     CallbackUrl = $"{gatewayUrl}/api/psp/callback"
                 };
 
-                _logger.LogInformation($"🌐 [TELECOM → GATEWAY] Sending request via Gateway: {gatewayUrl}/api/psp/payment/create");
+                _logger.LogInformation($"🌐 [TELECOM → PSP] Sending request directly to PSP via Gateway routing: {gatewayUrl}/api/psp/payment/create");
                 _logger.LogInformation($"Request data: {System.Text.Json.JsonSerializer.Serialize(pspRequest)}");
 
                 var client = _httpClientFactory.CreateClient();

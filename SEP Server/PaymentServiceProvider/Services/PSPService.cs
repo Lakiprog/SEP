@@ -72,6 +72,9 @@ namespace PaymentServiceProvider.Services
                     Amount = request.Amount,
                     Currency = request.Currency,
                     MerchantOrderId = request.MerchantOrderID,
+                    Description = request.Description,
+                    CustomerEmail = request.CustomerEmail,
+                    CustomerName = request.CustomerName,
                     MerchantTimestamp = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
                     ReturnUrl = request.ReturnURL,
@@ -208,7 +211,16 @@ namespace PaymentServiceProvider.Services
             {
                 Console.WriteLine($"[PSP] Looking up transaction: {callback.PSPTransactionId}");
 
-                var transaction = await GetTransactionAsync(callback.PSPTransactionId);
+                // First try to find by PSPTransactionId (for backwards compatibility)
+                var transaction = await GetTransactionAsync(callback.PSPTransactionId.ToUpper());
+                
+                // If not found, try to find by MerchantOrderId (for Bank callbacks that send MerchantOrderId)
+                if (transaction == null)
+                {
+                    Console.WriteLine($"[PSP] Transaction not found by PSPTransactionId, trying MerchantOrderId: {callback.PSPTransactionId}");
+                    transaction = await GetTransactionByMerchantOrderIdAsync(callback.PSPTransactionId);
+                }
+                
                 if (transaction == null)
                 {
                     Console.WriteLine($"[PSP] Transaction not found in database: {callback.PSPTransactionId}");
@@ -229,6 +241,12 @@ namespace PaymentServiceProvider.Services
 
                 await _transactionService.UpdateTransaction(transaction);
 
+                // If payment completed successfully, notify Telecom to create subscription
+                if (callback.Status == TransactionStatus.Completed)
+                {
+                    _ = Task.Run(async () => await NotifyTelecomOfCompletedPayment(transaction, callback));
+                }
+
                 return new PaymentStatusUpdate
                 {
                     PSPTransactionId = callback.PSPTransactionId,
@@ -247,6 +265,11 @@ namespace PaymentServiceProvider.Services
         public async Task<Transaction> GetTransactionAsync(string pspTransactionId)
         {
             return await _transactionService.GetByPSPTransactionId(pspTransactionId);
+        }
+
+        public async Task<Transaction> GetTransactionByMerchantOrderIdAsync(string merchantOrderId)
+        {
+            return await _transactionService.GetByMerchantOrderId(merchantOrderId);
         }
 
         public async Task<List<Transaction>> GetClientTransactionsAsync(string merchantId, int page = 1, int pageSize = 10)
@@ -333,6 +356,47 @@ namespace PaymentServiceProvider.Services
         private string GeneratePSPTransactionId()
         {
             return $"PSP_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..8].ToUpper()}";
+        }
+
+        private async Task NotifyTelecomOfCompletedPayment(Transaction transaction, PaymentCallback callback)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+
+                // Update subscription status via SubscriptionController
+                var subscriptionUpdateData = new
+                {
+                    TransactionId = transaction.MerchantOrderId.ToString(),
+                    IsPaid = true,
+                    PaymentMethod = "QR", // This should come from transaction
+                    StatusMessage = callback.StatusMessage ?? "Payment completed successfully"
+                };
+
+                Console.WriteLine($"[PSP] Notifying Telecom subscription update: {System.Text.Json.JsonSerializer.Serialize(subscriptionUpdateData)}");
+
+                var json = System.Text.Json.JsonSerializer.Serialize(subscriptionUpdateData);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                // Call Telecom subscription update endpoint via Gateway
+                var telecomCallbackUrl = "https://localhost:5001/api/telecom/Subscription/update-payment-status";
+                var response = await httpClient.PostAsync(telecomCallbackUrl, content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"[PSP] Successfully updated Telecom subscription for transaction: {transaction.MerchantOrderId}");
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[PSP] Failed to update Telecom subscription. Response: {response.StatusCode}");
+                    Console.WriteLine($"[PSP] Error details: {errorContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[PSP] Error notifying Telecom of completed payment: {ex.Message}");
+            }
         }
     }
 }

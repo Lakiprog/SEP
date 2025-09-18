@@ -21,7 +21,7 @@ const PackageDealsUser = () => {
 
   const fetchPackages = async () => {
     try {
-      const response = await axios.get('https://localhost:7010/api/packagedeal/packages');
+      const response = await axios.get('https://localhost:5001/api/telecom/packagedeal/packages');
       setPackages(response.data);
     } catch (err) {
       console.error('Error fetching packages:', err);
@@ -34,7 +34,7 @@ const PackageDealsUser = () => {
   const fetchSubscriptions = async () => {
     try {
       const userId = 1; // Mock user ID - in real app this would come from auth context
-      const response = await axios.get(`https://localhost:7010/api/packagedeal/subscriptions/${userId}`);
+      const response = await axios.get(`https://localhost:5001/api/telecom/packagedeal/subscriptions/${userId}`);
       setSubscriptions(response.data);
     } catch (err) {
       console.error('Error fetching subscriptions:', err);
@@ -55,24 +55,41 @@ const PackageDealsUser = () => {
       
       setSubscriptionLoading(true);
       
-      // Initiate payment through PSP
-      const paymentData = {
-        userId: 1, // Mock user ID
+      // Step 1: Pre-create subscription with PENDING status
+      const subscriptionData = {
+        userId: 1, // Mock user ID - in real app this would come from auth context
         packageId: selectedPackage.id,
         years: years,
-        amount: selectedPackage.price * years,
+        paymentMethod: 'QR' // Default, will be updated when payment is processed
+      };
+
+      console.log('Pre-creating subscription:', subscriptionData);
+      const subscriptionResponse = await axios.post('https://localhost:5001/api/telecom/subscription/pre-create', subscriptionData);
+      
+      console.log('Subscription pre-created:', subscriptionResponse.data);
+      
+      if (!subscriptionResponse.data.transactionId) {
+        throw new Error('Failed to create subscription');
+      }
+
+      // Step 2: Initiate payment through PSP using the subscription's transaction ID
+      const paymentData = {
+        userId: 1,
+        packageId: selectedPackage.id,
+        years: years,
+        amount: subscriptionResponse.data.amount,
         currency: 'USD',
         description: `Subscription to ${selectedPackage.name} for ${years} year(s)`,
         returnUrl: `${window.location.origin}/packageDealsUser?success=true`,
-        cancelUrl: `${window.location.origin}/packageDealsUser?cancelled=true`
+        cancelUrl: `${window.location.origin}/packageDealsUser?cancelled=true`,
+        subscriptionId: subscriptionResponse.data.subscriptionId,
+        transactionId: subscriptionResponse.data.transactionId
       };
 
       console.log('Sending payment data:', paymentData);
-      console.log('API URL:', 'https://localhost:7010/api/packagedeal/payment/initiate-psp');
-
-      const response = await axios.post('https://localhost:7010/api/packagedeal/payment/initiate-psp', paymentData);
+      const response = await axios.post('https://localhost:5001/api/telecom/packagedeal/payment/initiate-psp', paymentData);
       
-      console.log('Response received:', response.data);
+      console.log('Payment response received:', response.data);
       
       if (response.data && response.data.paymentSelectionUrl) {
         console.log('Redirecting to:', response.data.paymentSelectionUrl);
@@ -83,9 +100,9 @@ const PackageDealsUser = () => {
         toast.error('Failed to initiate payment. Please try again.');
       }
     } catch (err) {
-      console.error('Error initiating payment:', err);
+      console.error('Error in payment flow:', err);
       console.error('Error details:', err.response?.data);
-      toast.error(`Failed to initiate payment: ${err.message}`);
+      toast.error(`Failed to initiate payment: ${err.response?.data?.error || err.message}`);
     } finally {
       setSubscriptionLoading(false);
     }

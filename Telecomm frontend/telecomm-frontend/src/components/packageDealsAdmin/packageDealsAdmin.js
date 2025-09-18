@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Button, 
   Card, 
@@ -15,64 +15,103 @@ import {
   FormGroup,
   Label,
   Input,
-  Container
+  Container,
+  Spinner,
+  Alert
 } from "reactstrap";
+import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const PackageDealsAdmin = () => {
-  const [packages, setPackages] = useState([
-    { 
-      id: 1, 
-      name: "SBB EON Basic", 
-      price: 100.0,
-      category: "Basic",
-      active: true
-    },
-    { 
-      id: 2, 
-      name: "SBB EON Premium", 
-      price: 150.0,
-      category: "Premium",
-      active: true
-    },
-    { 
-      id: 3, 
-      name: "SBB Internet Only", 
-      price: 80.0,
-      category: "Internet",
-      active: false
-    },
-  ]);
+  const [packages, setPackages] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [showModal, setShowModal] = useState(false);
   const [editingPackage, setEditingPackage] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     price: '',
-    category: '',
+    categoryId: '',
+    description: '',
     active: true
   });
 
-  const handleSubmit = () => {
-    if (editingPackage) {
-      // Update existing package
-      setPackages(prev => prev.map(pkg => 
-        pkg.id === editingPackage.id 
-          ? { ...pkg, ...formData, price: parseFloat(formData.price) }
-          : pkg
-      ));
-    } else {
-      // Add new package
-      const newPackage = {
-        id: Date.now(),
-        ...formData,
-        price: parseFloat(formData.price)
-      };
-      setPackages(prev => [...prev, newPackage]);
+  useEffect(() => {
+    fetchPackages();
+    fetchCategories();
+  }, []);
+
+  const fetchPackages = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('https://localhost:5001/api/telecom/packagedeal/packages');
+      setPackages(response.data);
+      setError('');
+    } catch (err) {
+      console.error('Error fetching packages:', err);
+      setError('Failed to load packages');
+      toast.error('Failed to load packages');
+    } finally {
+      setLoading(false);
     }
-    
-    setShowModal(false);
-    setEditingPackage(null);
-    setFormData({ name: '', price: '', category: '', active: true });
+  };
+
+  const fetchCategories = async () => {
+    try {
+      // For now use hardcoded categories - in production you'd fetch from API
+      setCategories([
+        { id: 1, name: 'Internet' },
+        { id: 2, name: 'Mobile' },
+        { id: 3, name: 'TV' },
+        { id: 4, name: 'Bundle' }
+      ]);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+      toast.error('Failed to load categories');
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      if (editingPackage) {
+        // Update existing package
+        const updateData = {
+          id: editingPackage.id,
+          name: formData.name,
+          description: formData.description,
+          price: parseFloat(formData.price),
+          categoryId: parseInt(formData.categoryId) || null,
+          isActive: formData.active
+        };
+        
+        await axios.put(`https://localhost:5001/api/telecom/packagedeal/packages/${editingPackage.id}`, updateData);
+        toast.success('Package updated successfully!');
+      } else {
+        // Add new package
+        const newPackage = {
+          name: formData.name,
+          description: formData.description,
+          price: parseFloat(formData.price),
+          categoryId: parseInt(formData.categoryId) || null,
+          isActive: formData.active
+        };
+        
+        await axios.post('https://localhost:5001/api/telecom/packagedeal/packages', newPackage);
+        toast.success('Package added successfully!');
+      }
+      
+      // Refresh the packages list
+      await fetchPackages();
+      
+      setShowModal(false);
+      setEditingPackage(null);
+      setFormData({ name: '', price: '', categoryId: '', description: '', active: true });
+    } catch (err) {
+      console.error('Error saving package:', err);
+      toast.error('Failed to save package');
+    }
   };
 
   const onEdit = (pkg) => {
@@ -80,21 +119,29 @@ const PackageDealsAdmin = () => {
     setFormData({
       name: pkg.name,
       price: pkg.price.toString(),
-      category: pkg.category,
-      active: pkg.active
+      categoryId: pkg.categoryId ? pkg.categoryId.toString() : '',
+      description: pkg.description || '',
+      active: pkg.isActive
     });
     setShowModal(true);
   };
 
-  const onDelete = (pkg) => {
+  const onDelete = async (pkg) => {
     if (window.confirm('Are you sure you want to delete this package?')) {
-      setPackages(prev => prev.filter(p => p.id !== pkg.id));
+      try {
+        await axios.delete(`https://localhost:5001/api/telecom/packagedeal/packages/${pkg.id}`);
+        toast.success('Package deleted successfully!');
+        await fetchPackages(); // Refresh the list
+      } catch (err) {
+        console.error('Error deleting package:', err);
+        toast.error('Failed to delete package');
+      }
     }
   };
 
   const onAdd = () => {
     setEditingPackage(null);
-    setFormData({ name: '', price: '', category: '', active: true });
+    setFormData({ name: '', price: '', categoryId: '', description: '', active: true });
     setShowModal(true);
   };
 
@@ -117,6 +164,21 @@ const PackageDealsAdmin = () => {
             ⚙️ Telecommunications package management
           </p>
         </div>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert color="danger" className="mb-4">
+            {error}
+          </Alert>
+        )}
+
+        {/* Loading Spinner */}
+        {loading && (
+          <div className="text-center mb-4">
+            <Spinner color="primary" />
+            <p className="mt-2">Loading packages...</p>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <Row className="mb-4">
@@ -198,12 +260,12 @@ const PackageDealsAdmin = () => {
                       <strong>{pkg.name}</strong>
                     </td>
                     <td>
-                      <Badge color="info">{pkg.category}</Badge>
+                      <Badge color="info">{pkg.category ? pkg.category.name : 'No Category'}</Badge>
                     </td>
                     <td>
                       <span className="fw-bold text-success">€{pkg.price}</span>
                     </td>
-                    <td>{getStatusBadge(pkg.active)}</td>
+                    <td>{getStatusBadge(pkg.isActive)}</td>
                     <td>
                       <Button color="info" size="sm" className="me-1" title="View">
                         👁️
@@ -264,19 +326,29 @@ const PackageDealsAdmin = () => {
                   placeholder="Enter package name"
                 />
               </FormGroup>
+              <FormGroup>
+                <Label><span className="me-2">📝</span>Description</Label>
+                <Input
+                  type="textarea"
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  placeholder="Enter package description"
+                  rows="3"
+                />
+              </FormGroup>
               <Row>
                 <Col md={6}>
                   <FormGroup>
                     <Label><span className="me-2">⭐</span>Category</Label>
                     <Input
                       type="select"
-                      value={formData.category}
-                      onChange={(e) => setFormData({...formData, category: e.target.value})}
+                      value={formData.categoryId}
+                      onChange={(e) => setFormData({...formData, categoryId: e.target.value})}
                     >
                       <option value="">Select category</option>
-                      <option value="Basic">Basic</option>
-                      <option value="Premium">Premium</option>
-                      <option value="Internet">Internet</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
                     </Input>
                   </FormGroup>
                 </Col>
@@ -288,6 +360,8 @@ const PackageDealsAdmin = () => {
                       value={formData.price}
                       onChange={(e) => setFormData({...formData, price: e.target.value})}
                       placeholder="0.00"
+                      step="0.01"
+                      min="0"
                     />
                   </FormGroup>
                 </Col>

@@ -10,5 +10,7 @@ namespace Telecom.DTO
         public string Description { get; set; } = string.Empty;
         public string ReturnUrl { get; set; } = string.Empty;
         public string CancelUrl { get; set; } = string.Empty;
+        public int SubscriptionId { get; set; } // Added for linking to pre-created subscription
+        public string TransactionId { get; set; } = string.Empty; // Transaction ID from pre-created subscription
     }
 }
