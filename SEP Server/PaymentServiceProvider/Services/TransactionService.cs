@@ -77,6 +77,11 @@ namespace PaymentServiceProvider.Services
             return await _transactionRepository.GetByPSPTransactionId(pspTransactionId);
         }
 
+        public async Task<Transaction> GetByMerchantOrderId(string merchantOrderId)
+        {
+            return await _transactionRepository.GetByMerchantOrderId(merchantOrderId);
+        }
+
         public async Task<Transaction> UpdateTransaction(Transaction transaction)
         {
             return await _transactionRepository.Update(transaction.Id, transaction);

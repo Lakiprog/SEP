@@ -11,6 +11,7 @@ namespace Telecom.Interfaces
         Task<PackageDeal> UpdatePackageAsync(PackageDeal package);
         Task DeletePackageAsync(int id);
         Task<Subscription> SubscribeToPackageAsync(SubscriptionRequest request);
+        Task<Subscription> CreateSubscriptionFromPayment(PaymentCallbackRequest paymentCallback);
         Task<IEnumerable<Subscription>> GetUserSubscriptionsAsync(int userId);
     }
 }

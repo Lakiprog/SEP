@@ -269,12 +269,12 @@ namespace BankService.Controllers
                 if (transactionResult.Success)
                 {
                     var pspTransactionId = !string.IsNullOrEmpty(request.PSPTransactionId) ? request.PSPTransactionId : request.PAYMENT_ID;
-                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(pspTransactionId, "SUCCESS", request.Amount, "CARD"));
+                    _ = Task.Run(async () => await NotifyPSPOfCardTransactionStatus(pspTransactionId, transaction.MerchantOrderId, "SUCCESS", request.Amount));
                 }
                 else
                 {
                     var pspTransactionId = !string.IsNullOrEmpty(request.PSPTransactionId) ? request.PSPTransactionId : request.PAYMENT_ID;
-                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(pspTransactionId, "FAILED", request.Amount, "CARD"));
+                    _ = Task.Run(async () => await NotifyPSPOfCardTransactionStatus(pspTransactionId, transaction.MerchantOrderId, "FAILED", request.Amount));
                 }
 
                 return Ok(new {
@@ -494,11 +494,11 @@ namespace BankService.Controllers
                 // For PCC issuer requests, the AcquirerOrderId is the PSP Transaction ID
                 if (transactionResult.Success)
                 {
-                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(request.AcquirerOrderId, "SUCCESS", request.Amount, "CARD"));
+                    _ = Task.Run(async () => await NotifyPSPOfCardTransactionStatus(request.AcquirerOrderId, tempTransaction.MerchantOrderId, "SUCCESS", request.Amount));
                 }
                 else
                 {
-                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(request.AcquirerOrderId, "FAILED", request.Amount, "CARD"));
+                    _ = Task.Run(async () => await NotifyPSPOfCardTransactionStatus(request.AcquirerOrderId, tempTransaction.MerchantOrderId, "FAILED", request.Amount));
                 }
 
                 // Return response to PCC
@@ -597,7 +597,7 @@ namespace BankService.Controllers
                 // Send callback to PSP if transaction is successful
                 if (isSuccess)
                 {
-                    _ = Task.Run(async () => await NotifyPSPOfTransactionStatus(transaction.PaymentId, "SUCCESS", transaction.Amount));
+                    _ = Task.Run(async () => await NotifyPSPOfQRTransactionStatus(transaction.PaymentId, transaction.MerchantOrderId, "SUCCESS", transaction.Amount));
                 }
 
                 var result = new
@@ -633,7 +633,7 @@ namespace BankService.Controllers
             }
         }
 
-        private async Task NotifyPSPOfTransactionStatus(string paymentId, string status, decimal amount, string paymentType = "QR")
+        private async Task NotifyPSPOfQRTransactionStatus(string paymentId, string merchantOrderId, string status, decimal amount)
         {
             try
             {
@@ -651,20 +651,18 @@ namespace BankService.Controllers
 
                 var callbackData = new
                 {
-                    PSPTransactionId = paymentId,
+                    PSPTransactionId = merchantOrderId, // For QR: use MerchantOrderId that PSP expects
                     ExternalTransactionId = paymentId,
                     Status = status == "SUCCESS" ? 2 : 3, // 2 = Completed, 3 = Failed (enum values)
-                    StatusMessage = status == "SUCCESS" ?
-                        (paymentType == "CARD" ? "Card payment completed successfully" : "QR payment completed successfully") :
-                        (paymentType == "CARD" ? "Card payment failed" : "QR payment failed"),
+                    StatusMessage = status == "SUCCESS" ? "QR payment completed successfully" : "QR payment failed",
                     Amount = amount,
                     Currency = "RSD",
                     Timestamp = DateTime.UtcNow,
                     AdditionalData = new Dictionary<string, object>
                     {
-                        { "source", paymentType == "CARD" ? "BANK_CARD_PAYMENT" : "BANK_QR_PAYMENT" },
+                        { "source", "BANK_QR_PAYMENT" },
                         { "originalTransactionId", paymentId },
-                        { "paymentType", paymentType }
+                        { "paymentType", "QR" }
                     }
                 };
 
@@ -688,7 +686,64 @@ namespace BankService.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error notifying PSP of transaction {paymentId} status: {ex.Message}");
+                Console.WriteLine($"Error notifying PSP of QR transaction {paymentId} status: {ex.Message}");
+            }
+        }
+
+        private async Task NotifyPSPOfCardTransactionStatus(string paymentId, string merchantOrderId, string status, decimal amount)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+
+                // Create Consul client directly since HttpContext is not available in Task.Run
+                var consulConfig = new ConsulClientConfiguration
+                {
+                    Address = new Uri("http://localhost:8500")
+                };
+                using var consulClient = new ConsulClient(consulConfig);
+
+                var pspServiceUrl = await GetServiceUrlFromConsulStatic(consulClient, paymentId);
+                var pspCallbackUrl = $"{pspServiceUrl}/api/psp/callback";
+
+                var callbackData = new
+                {
+                    PSPTransactionId = merchantOrderId, // For Card: also use MerchantOrderId now
+                    ExternalTransactionId = paymentId,
+                    Status = status == "SUCCESS" ? 2 : 3, // 2 = Completed, 3 = Failed (enum values)
+                    StatusMessage = status == "SUCCESS" ? "Card payment completed successfully" : "Card payment failed",
+                    Amount = amount,
+                    Currency = "RSD",
+                    Timestamp = DateTime.UtcNow,
+                    AdditionalData = new Dictionary<string, object>
+                    {
+                        { "source", "BANK_CARD_PAYMENT" },
+                        { "originalTransactionId", paymentId },
+                        { "paymentType", "CARD" }
+                    }
+                };
+
+                Console.WriteLine($"[BANK] Sending callback data: {System.Text.Json.JsonSerializer.Serialize(callbackData)}");
+
+                var json = System.Text.Json.JsonSerializer.Serialize(callbackData);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync(pspCallbackUrl, content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Successfully notified PSP of card transaction {paymentId} status: {status}");
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Failed to notify PSP of card transaction {paymentId} status. Response: {response.StatusCode}");
+                    Console.WriteLine($"Error details: {errorContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error notifying PSP of card transaction {paymentId} status: {ex.Message}");
             }
         }
 

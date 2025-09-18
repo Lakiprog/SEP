@@ -149,6 +149,57 @@ namespace Telecom.Services
             }
         }
 
+        public async Task<Subscription> CreateSubscriptionFromPayment(DTO.PaymentCallbackRequest paymentCallback)
+        {
+            try
+            {
+                _logger.LogInformation($"Creating subscription from payment callback: {paymentCallback.TransactionId}");
+                
+                // Parse description to extract package and user info
+                // Expected format: "Subscription to Premium Package for 1 year(s)"
+                var description = paymentCallback.Description;
+                
+                // For now, create a basic subscription with default values
+                // In a real system, you'd store the package/user info when creating the payment
+                var packages = await GetAllPackagesAsync();
+                var defaultPackage = packages.FirstOrDefault(); // Use first package as default
+                
+                if (defaultPackage == null)
+                {
+                    throw new Exception("No packages available for subscription");
+                }
+
+                var subscription = new Subscription
+                {
+                    UserId = 1, // Default user - should be extracted from payment data
+                    PackageId = defaultPackage.Id,
+                    Years = 1, // Default - should be extracted from description
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddYears(1),
+                    Status = "ACTIVE",
+                    PaymentMethod = !string.IsNullOrEmpty(paymentCallback.PaymentMethod) 
+                                    ? paymentCallback.PaymentMethod 
+                                    : "Unknown", // Use actual payment method from callback
+                    Amount = paymentCallback.Amount,
+                    TransactionId = Guid.Parse(paymentCallback.TransactionId),
+                    TimeOfPayment = paymentCallback.Timestamp,
+                    IsPaid = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Subscriptions.Add(subscription);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation($"Subscription created successfully: ID={subscription.Id}, Package={defaultPackage.Name}, Amount={paymentCallback.Amount}");
+                return subscription;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating subscription from payment");
+                throw;
+            }
+        }
+
         public async Task<IEnumerable<Subscription>> GetUserSubscriptionsAsync(int userId)
         {
             try
