@@ -18,12 +18,24 @@ export class HttpRequest {
     // setupCache(axios);
   }
 
+  getAuthHeaders() {
+    const token = localStorage.getItem('token');
+    if (token) {
+      return {
+        ...this.baseConfig.headers,
+        Authorization: `Bearer ${token}`
+      };
+    }
+    return this.baseConfig.headers;
+  }
+
   get(requestPath, params) {
     var config = {
       ...this.baseConfig,
       method: "get",
       url: requestPath,
       params: params,
+      headers: this.getAuthHeaders(),
     };
     return makeCall(config);
   }
@@ -35,6 +47,7 @@ export class HttpRequest {
       url: requestPath,
       //   data: JSON.stringify(data),
       data: data,
+      headers: this.getAuthHeaders(),
     };
     return makeCall(config);
   }
@@ -45,6 +58,7 @@ export class HttpRequest {
       method: "delete",
       url: requestPath,
       data: data,
+      headers: this.getAuthHeaders(),
     };
     return makeCall(config);
   }
@@ -64,7 +78,34 @@ const makeCall = (config) => {
           return;
         }
 
-        reject({ errMsg: err.message });
+        // Handle HTTP error responses
+        if (err.response) {
+          // Server responded with error status
+          const status = err.response.status;
+          const data = err.response.data;
+
+          // Try to extract error message from response
+          let errorMessage = err.message;
+          if (typeof data === 'string') {
+            errorMessage = data;
+          } else if (data && data.message) {
+            errorMessage = data.message;
+          } else if (data && typeof data === 'object') {
+            errorMessage = JSON.stringify(data);
+          }
+
+          reject({
+            errMsg: errorMessage,
+            status: status,
+            response: data
+          });
+        } else if (err.request) {
+          // Network error
+          reject({ errMsg: "Network error. Please check your connection." });
+        } else {
+          // Other error
+          reject({ errMsg: err.message });
+        }
       });
   });
 };

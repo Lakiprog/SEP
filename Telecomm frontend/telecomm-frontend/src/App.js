@@ -1,6 +1,8 @@
 import "./App.css";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
 import Layout from "./components/layout/Layout";
+import ProtectedRoute from "./components/common/ProtectedRoute";
 import Home from "./components/home/Home";
 import Registration from "./components/registration/registration";
 import Login from "./components/login/login";
@@ -34,53 +36,101 @@ function App() {
         },
         {
           path: "/packageDealsAdmin",
-          element: <PackageDealsAdmin />,
+          element: (
+            <ProtectedRoute requiredUserType="SuperAdmin">
+              <PackageDealsAdmin />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/packageDealsUser",
-          element: <PackageDealsUser />,
+          element: (
+            <ProtectedRoute>
+              <PackageDealsUser />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/paymentTypes",
-          element: <PaymentTypes />,
+          element: (
+            <ProtectedRoute>
+              <PaymentTypes />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/payment/status",
-          element: <PaymentStatusPage />,
+          element: (
+            <ProtectedRoute>
+              <PaymentStatusPage />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/payment/success",
-          element: <PaymentSuccessPage />,
+          element: (
+            <ProtectedRoute>
+              <PaymentSuccessPage />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/payment/cancel",
-          element: <PaymentCancelPage />,
+          element: (
+            <ProtectedRoute>
+              <PaymentCancelPage />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/payment/failed",
-          element: <PaymentStatusPage />,
+          element: (
+            <ProtectedRoute>
+              <PaymentStatusPage />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/payment/error",
-          element: <PaymentStatusPage />,
+          element: (
+            <ProtectedRoute>
+              <PaymentStatusPage />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/bank/payment",
-          element: <BankPaymentPage />,
+          element: (
+            <ProtectedRoute>
+              <BankPaymentPage />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/packages",
-          element: <PackageDealsUser />,
+          element: (
+            <ProtectedRoute>
+              <PackageDealsUser />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "/payment/flow",
-          element: <PaymentFlow />,
+          element: (
+            <ProtectedRoute>
+              <PaymentFlow />
+            </ProtectedRoute>
+          ),
         },
       ],
     },
   ]);
 
-  return <RouterProvider router={router}></RouterProvider>;
+  return (
+    <AuthProvider>
+      <RouterProvider router={router}></RouterProvider>
+    </AuthProvider>
+  );
 }
 
 export default App;

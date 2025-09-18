@@ -1,7 +1,11 @@
 import React from "react";
 import { Container, Row, Col, Card, CardBody, CardTitle, CardText, Button } from "reactstrap";
+import { useAuth } from "../../contexts/AuthContext";
 
 const Home = () => {
+  const { user, isAuthenticated } = useAuth();
+  const isAdmin = isAuthenticated && user?.userType === "SuperAdmin";
+
   return (
     <Container className="mt-5">
       <Row className="mb-4">
@@ -44,20 +48,22 @@ const Home = () => {
           </Card>
         </Col>
 
-        <Col md={6} lg={3}>
-          <Card className="h-100 text-center">
-            <CardBody>
-              <div className="text-warning mb-3" style={{ fontSize: "48px", fontWeight: "bold" }}>⚙️</div>
-              <CardTitle tag="h5">Administration</CardTitle>
-              <CardText>
-                Manage packages and users
-              </CardText>
-              <Button color="warning" href="/packageDealsAdmin">
-                Admin Panel
-              </Button>
-            </CardBody>
-          </Card>
-        </Col>
+        {isAdmin && (
+          <Col md={6} lg={3}>
+            <Card className="h-100 text-center">
+              <CardBody>
+                <div className="text-warning mb-3" style={{ fontSize: "48px", fontWeight: "bold" }}>⚙️</div>
+                <CardTitle tag="h5">Administration</CardTitle>
+                <CardText>
+                  Manage packages and users
+                </CardText>
+                <Button color="warning" href="/packageDealsAdmin">
+                  Admin Panel
+                </Button>
+              </CardBody>
+            </Card>
+          </Col>
+        )}
       </Row>
     </Container>
   );

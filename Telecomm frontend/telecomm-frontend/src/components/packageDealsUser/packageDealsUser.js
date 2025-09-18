@@ -52,9 +52,9 @@ const PackageDealsUser = () => {
       console.log('Pay Now button clicked!');
       console.log('Selected package:', selectedPackage);
       console.log('Years:', years);
-      
+
       setSubscriptionLoading(true);
-      
+
       // Step 1: Pre-create subscription with PENDING status
       const subscriptionData = {
         userId: 1, // Mock user ID - in real app this would come from auth context
@@ -65,9 +65,9 @@ const PackageDealsUser = () => {
 
       console.log('Pre-creating subscription:', subscriptionData);
       const subscriptionResponse = await axios.post('https://localhost:5001/api/telecom/subscription/pre-create', subscriptionData);
-      
+
       console.log('Subscription pre-created:', subscriptionResponse.data);
-      
+
       if (!subscriptionResponse.data.transactionId) {
         throw new Error('Failed to create subscription');
       }
@@ -88,9 +88,9 @@ const PackageDealsUser = () => {
 
       console.log('Sending payment data:', paymentData);
       const response = await axios.post('https://localhost:5001/api/telecom/packagedeal/payment/initiate-psp', paymentData);
-      
+
       console.log('Payment response received:', response.data);
-      
+
       if (response.data && response.data.paymentSelectionUrl) {
         console.log('Redirecting to:', response.data.paymentSelectionUrl);
         // Redirect to PSP payment selection page

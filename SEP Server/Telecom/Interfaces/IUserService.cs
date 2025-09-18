@@ -1,4 +1,5 @@
 ﻿using Telecom.Models;
+using Telecom.DTO;
 
 namespace Telecom.Interfaces
 {
@@ -6,6 +7,6 @@ namespace Telecom.Interfaces
     {
         Task<User> RegisterUser(User user);
         Task<User> GetUserById(int userId);
-        Task<string> Login(string username, string password);
+        Task<LoginResponse> Login(string username, string password);
     }
 }
