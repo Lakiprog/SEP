@@ -76,6 +76,9 @@ namespace PaymentServiceProvider.Controllers
 
                     await _pspService.UpdatePaymentStatusAsync(callback);
 
+                    // Notify Gateway about payment completion
+                    await NotifyGatewayOfPaymentCompletion(callback);
+
                     // Redirect to merchant success URL
                     if (!string.IsNullOrEmpty(transaction.ReturnUrl))
                     {
@@ -235,19 +238,58 @@ namespace PaymentServiceProvider.Controllers
             }
         }
 
+        private async Task NotifyGatewayOfPaymentCompletion(PaymentCallback callback)
+        {
+            try
+            {
+                var gatewayUrl = "https://localhost:5001"; // Gateway URL
+                var callbackData = new
+                {
+                    PSPTransactionId = callback.PSPTransactionId,
+                    ExternalTransactionId = callback.ExternalTransactionId,
+                    Status = (int)callback.Status, // Convert enum to int
+                    StatusMessage = callback.StatusMessage,
+                    Amount = callback.Amount,
+                    Currency = callback.Currency,
+                    Timestamp = callback.Timestamp
+                };
+
+                var json = JsonSerializer.Serialize(callbackData);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                _logger.LogInformation($"Notifying Gateway of payment completion: {json}");
+
+                var response = await _httpClient.PostAsync($"{gatewayUrl}/api/payment/psp/callback", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation($"Successfully notified Gateway of payment completion for transaction {callback.PSPTransactionId}");
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError($"Failed to notify Gateway: {response.StatusCode} - {errorContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error notifying Gateway of payment completion for transaction {callback.PSPTransactionId}");
+            }
+        }
+
         private string AddParametersToUrl(string baseUrl, Dictionary<string, string> parameters)
         {
             var uriBuilder = new UriBuilder(baseUrl);
             var queryString = "";
-            
+
             if (!string.IsNullOrEmpty(uriBuilder.Query))
             {
                 queryString = uriBuilder.Query.TrimStart('?') + "&";
             }
-            
+
             var paramStrings = parameters.Select(p => $"{Uri.EscapeDataString(p.Key)}={Uri.EscapeDataString(p.Value)}");
             queryString += string.Join("&", paramStrings);
-            
+
             uriBuilder.Query = queryString;
             return uriBuilder.ToString();
         }

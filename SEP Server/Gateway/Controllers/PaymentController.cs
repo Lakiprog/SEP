@@ -319,7 +319,7 @@ namespace Gateway.Controllers
             {
                 var client = _httpClientFactory.CreateClient();
                 var response = await client.PostAsJsonAsync("https://localhost:7001/api/bank/validate-qr", request);
-                
+
                 if (response.IsSuccessStatusCode)
                 {
                     var result = await response.Content.ReadFromJsonAsync<object>();
@@ -334,6 +334,53 @@ namespace Gateway.Controllers
             {
                 _logger.LogError(ex, "Error validating QR code");
                 return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("psp/callback")]
+        public async Task<IActionResult> HandlePSPCallback([FromBody] PSPCallbackRequest callbackRequest)
+        {
+            try
+            {
+                _logger.LogInformation($"Received PSP callback: TransactionId={callbackRequest.PSPTransactionId}, Status={callbackRequest.Status}");
+
+                // Only process completed payments
+                if (callbackRequest.Status == 2) // TransactionStatus.Completed
+                {
+                    // Extract package information from transaction data
+                    // You might need to store this mapping when creating the transaction
+                    var telecomCallbackData = new
+                    {
+                        transactionId = callbackRequest.PSPTransactionId,
+                        externalTransactionId = callbackRequest.ExternalTransactionId,
+                        status = "completed",
+                        amount = callbackRequest.Amount,
+                        currency = callbackRequest.Currency,
+                        timestamp = callbackRequest.Timestamp
+                    };
+
+                    // Notify Telecom service to create subscription
+                    var client = _httpClientFactory.CreateClient();
+                    var telecomUrl = "https://localhost:7006";
+                    var telecomResponse = await client.PostAsJsonAsync($"{telecomUrl}/api/packagedeal/payment-completed", telecomCallbackData);
+
+                    if (telecomResponse.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation($"Successfully notified Telecom service of completed payment: {callbackRequest.PSPTransactionId}");
+                    }
+                    else
+                    {
+                        var errorContent = await telecomResponse.Content.ReadAsStringAsync();
+                        _logger.LogError($"Failed to notify Telecom service: {telecomResponse.StatusCode} - {errorContent}");
+                    }
+                }
+
+                return Ok(new { message = "Callback processed successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error processing PSP callback for transaction {callbackRequest?.PSPTransactionId}");
+                return StatusCode(500, new { error = "Internal server error processing callback" });
             }
         }
     }
@@ -375,5 +422,16 @@ namespace Gateway.Controllers
         public string Description { get; set; } = string.Empty;
         public string ReturnUrl { get; set; } = string.Empty;
         public string CancelUrl { get; set; } = string.Empty;
+    }
+
+    public class PSPCallbackRequest
+    {
+        public string PSPTransactionId { get; set; } = string.Empty;
+        public string ExternalTransactionId { get; set; } = string.Empty;
+        public int Status { get; set; } // 2 = Completed, 3 = Failed
+        public string StatusMessage { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string Currency { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; }
     }
 }

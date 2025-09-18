@@ -11,11 +11,13 @@ namespace PaymentServiceProvider.Controllers
     {
         private readonly IPSPService _pspService;
         private readonly IPaymentPluginManager _pluginManager;
+        private readonly ILogger<PSPController> _logger;
 
-        public PSPController(IPSPService pspService, IPaymentPluginManager pluginManager)
+        public PSPController(IPSPService pspService, IPaymentPluginManager pluginManager, ILogger<PSPController> logger)
         {
             _pspService = pspService;
             _pluginManager = pluginManager;
+            _logger = logger;
         }
 
         /// <summary>
@@ -143,7 +145,14 @@ namespace PaymentServiceProvider.Controllers
         {
             try
             {
+                _logger.LogInformation("[PSP] Creating payment for merchant {MerchantId}, amount: {Amount} {Currency}",
+                    request.MerchantId, request.Amount, request.Currency);
+
                 var response = await _pspService.CreatePaymentAsync(request);
+
+                _logger.LogInformation("[PSP] Payment created - Success: {Success}, TransactionId: {TransactionId}, PaymentSelectionUrl: {PaymentSelectionUrl}",
+                    response.Success, response.PSPTransactionId, response.PaymentSelectionUrl);
+
                 return Ok(response);
             }
             catch (Exception ex)
@@ -243,9 +252,31 @@ namespace PaymentServiceProvider.Controllers
         {
             try
             {
+                _logger.LogInformation("[PSP] Callback received - PSPTransactionId: {PSPTransactionId}, Status: {Status}",
+                    callback?.PSPTransactionId ?? "NULL", callback?.Status.ToString() ?? "NULL");
+
+                if (callback == null)
+                {
+                    _logger.LogError("[PSP] Callback object is null");
+                    return BadRequest(new { message = "Callback data is null" });
+                }
+
+                if (string.IsNullOrEmpty(callback.PSPTransactionId))
+                {
+                    _logger.LogError("[PSP] PSPTransactionId is null or empty");
+                    return BadRequest(new { message = "PSPTransactionId is required" });
+                }
+
                 var update = await _pspService.UpdatePaymentStatusAsync(callback);
                 if (update == null)
-                    return BadRequest(new { message = "Invalid callback data" });
+                {
+                    _logger.LogError("[PSP] Callback failed - Transaction not found: {PSPTransactionId}",
+                        callback.PSPTransactionId);
+                    return BadRequest(new { message = "Invalid callback data - transaction not found" });
+                }
+
+                _logger.LogInformation("[PSP] Callback processed successfully for transaction: {PSPTransactionId}",
+                    callback.PSPTransactionId);
 
                 return Ok(update);
             }

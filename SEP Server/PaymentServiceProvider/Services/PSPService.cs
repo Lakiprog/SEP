@@ -52,23 +52,23 @@ namespace PaymentServiceProvider.Services
                     };
                 }
 
-                // Get card payment type (assuming it's the first one with type "card")
-                var cardPaymentType = await _paymentTypeService.GetByType("card");
-                if (cardPaymentType == null)
+                // Get default payment type (card) - this will be updated later when processing
+                var defaultPaymentType = await _paymentTypeService.GetByType("card");
+                if (defaultPaymentType == null)
                 {
                     return new PaymentResponse
                     {
                         Success = false,
-                        Message = "Card payment type not found",
+                        Message = "Default payment type not found",
                         ErrorCode = "PAYMENT_TYPE_NOT_FOUND"
                     };
                 }
 
-                // Create transaction with card payment type
+                // Create transaction with default payment type (will be updated during processing)
                 var transaction = new Transaction
                 {
                     WebShopClientId = client.Id,
-                    PaymentTypeId = cardPaymentType.Id,
+                    PaymentTypeId = defaultPaymentType.Id,
                     Amount = request.Amount,
                     Currency = request.Currency,
                     MerchantOrderId = request.MerchantOrderID,
@@ -87,10 +87,15 @@ namespace PaymentServiceProvider.Services
                 // Get available payment methods for this client
                 var availableMethods = await _pluginManager.GetAvailablePaymentMethodsAsync(client.Id);
 
+                // Generate payment selection URL for frontend
+                var paymentSelectionUrl = $"http://localhost:3001/payment-selection/{createdTransaction.PSPTransactionId}";
+
                 return new PaymentResponse
                 {
                     Success = true,
                     PSPTransactionId = createdTransaction.PSPTransactionId,
+                    TransactionId = createdTransaction.PSPTransactionId, // Duplicate for compatibility
+                    PaymentSelectionUrl = paymentSelectionUrl,
                     Message = "Payment created successfully",
                     AvailablePaymentMethods = availableMethods
                 };
@@ -144,6 +149,13 @@ namespace PaymentServiceProvider.Services
                     };
                 }
 
+                // Update payment type based on selected method
+                var selectedPaymentType = await _paymentTypeService.GetByType(paymentType);
+                if (selectedPaymentType != null)
+                {
+                    transaction.PaymentTypeId = selectedPaymentType.Id;
+                }
+
                 // Update transaction status to processing
                 transaction.Status = TransactionStatus.Processing;
                 await _transactionService.UpdateTransaction(transaction);
@@ -194,11 +206,16 @@ namespace PaymentServiceProvider.Services
         {
             try
             {
+                Console.WriteLine($"[PSP] Looking up transaction: {callback.PSPTransactionId}");
+
                 var transaction = await GetTransactionAsync(callback.PSPTransactionId);
                 if (transaction == null)
                 {
+                    Console.WriteLine($"[PSP] Transaction not found in database: {callback.PSPTransactionId}");
                     return null;
                 }
+
+                Console.WriteLine($"[PSP] Transaction found: {transaction.PSPTransactionId}, current status: {transaction.Status}");
 
                 // Update transaction status
                 transaction.Status = callback.Status;

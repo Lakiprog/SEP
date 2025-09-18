@@ -121,8 +121,8 @@ namespace Telecom.Services
             {
                 _logger.LogInformation($"Initiating PSP payment for package {request.PackageId}, amount: {request.Amount}");
 
-                var pspUrl = _configuration["PSP:BaseUrl"] ?? "https://localhost:7006";
-                
+                var gatewayUrl = _configuration["Gateway:BaseUrl"] ?? "https://localhost:5001";
+
                 // Create PSP payment initiation request
                 var pspRequest = new
                 {
@@ -136,16 +136,16 @@ namespace Telecom.Services
                     CustomerName = $"User {request.UserId}", // Mock name
                     ReturnUrl = request.ReturnUrl,
                     CancelUrl = request.CancelUrl,
-                    CallbackUrl = $"{pspUrl}/api/payment/callback"
+                    CallbackUrl = $"{gatewayUrl}/api/psp/callback"
                 };
 
-                _logger.LogInformation($"Sending request to PSP: {pspUrl}/api/payment/initiate");
+                _logger.LogInformation($"🌐 [TELECOM → GATEWAY] Sending request via Gateway: {gatewayUrl}/api/psp/payment/create");
                 _logger.LogInformation($"Request data: {System.Text.Json.JsonSerializer.Serialize(pspRequest)}");
 
                 var client = _httpClientFactory.CreateClient();
-                var response = await client.PostAsJsonAsync($"{pspUrl}/api/payment/initiate", pspRequest);
+                var response = await client.PostAsJsonAsync($"{gatewayUrl}/api/psp/payment/create", pspRequest);
 
-                _logger.LogInformation($"PSP Response Status: {response.StatusCode}");
+                _logger.LogInformation($"🌐 [GATEWAY] Response Status: {response.StatusCode}");
                 
                 if (response.IsSuccessStatusCode)
                 {

@@ -10,4 +10,14 @@ namespace Telecom.DTO
         public string ReturnUrl { get; set; } = string.Empty;
         public string CancelUrl { get; set; } = string.Empty;
     }
+
+    public class PaymentCompletedRequest
+    {
+        public string TransactionId { get; set; } = string.Empty;
+        public string ExternalTransactionId { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string Currency { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; }
+    }
 }

@@ -180,5 +180,57 @@ namespace Telecom.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+
+        [HttpPost("payment-completed")]
+        public async Task<IActionResult> HandlePaymentCompleted([FromBody] PaymentCompletedRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Received payment completion notification: TransactionId={request.TransactionId}, Amount={request.Amount}");
+
+                // Extract package information from transaction ID or additional data
+                // For now, we'll need to get the package info from the transaction data
+                // You might need to enhance this logic based on how you store the relationship
+
+                // For demo purposes, create a subscription for the default package
+                // In real implementation, you should store the package ID when creating the payment
+                var packages = await _packageDealService.GetAllPackagesAsync();
+                var selectedPackage = packages.FirstOrDefault(p => Math.Abs(p.Price - request.Amount) < 0.01m);
+
+                if (selectedPackage != null)
+                {
+                    var subscriptionRequest = new SubscriptionRequest
+                    {
+                        UserId = 1, // You'll need to extract this from the payment context
+                        PackageId = selectedPackage.Id,
+                        Years = 1, // Default to 1 year subscription
+                        PaymentMethod = "paypal",
+                        SubscriptionDate = DateTime.UtcNow
+                    };
+
+                    var subscription = await _packageDealService.SubscribeToPackageAsync(subscriptionRequest);
+
+                    _logger.LogInformation($"Successfully created subscription {subscription.Id} for user {subscriptionRequest.UserId} and package {selectedPackage.Name}");
+
+                    return Ok(new
+                    {
+                        success = true,
+                        subscriptionId = subscription.Id,
+                        message = "Subscription created successfully",
+                        packageName = selectedPackage.Name
+                    });
+                }
+                else
+                {
+                    _logger.LogWarning($"No matching package found for amount {request.Amount}");
+                    return BadRequest(new { error = "No matching package found for payment amount" });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error processing payment completion for transaction {request.TransactionId}");
+                return StatusCode(500, new { error = "Internal server error processing payment completion" });
+            }
+        }
     }
 }

@@ -161,11 +161,11 @@ lifetime.ApplicationStarted.Register(async () =>
             ID = "payment-service-provider-1",
             Name = "payment-service-provider",
             Address = "localhost",
-            Port = 7001,
+            Port = 7006,
             Tags = new[] { "payment", "psp", "gateway" },
             Check = new AgentServiceCheck
             {
-                HTTP = "https://localhost:7001/health",
+                HTTP = "https://localhost:7006/health",
                 Interval = TimeSpan.FromSeconds(10),
                 Timeout = TimeSpan.FromSeconds(5),
                 DeregisterCriticalServiceAfter = TimeSpan.FromMinutes(1)
