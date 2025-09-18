@@ -60,7 +60,7 @@ const PackageDealsUser = () => {
         userId: 1, // Mock user ID - in real app this would come from auth context
         packageId: selectedPackage.id,
         years: years,
-        paymentMethod: 'QR' // Default, will be updated when payment is processed
+        paymentMethod: 'Unknown' // Will be updated with actual payment method when payment is processed
       };
 
       console.log('Pre-creating subscription:', subscriptionData);

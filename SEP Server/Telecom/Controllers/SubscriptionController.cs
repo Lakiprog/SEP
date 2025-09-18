@@ -106,6 +106,7 @@ namespace Telecom.Controllers
                 subscription.IsPaid = request.IsPaid;
                 subscription.Status = request.IsPaid ? "ACTIVE" : "FAILED";
                 subscription.TimeOfPayment = request.IsPaid ? DateTime.UtcNow : null;
+                subscription.PaymentMethod = !string.IsNullOrEmpty(request.PaymentMethod) ? request.PaymentMethod : subscription.PaymentMethod;
 
                 var updatedSubscription = await _subscriptionService.UpdateSubscription(subscription);
 

@@ -177,7 +177,9 @@ namespace Telecom.Services
                     StartDate = DateTime.UtcNow,
                     EndDate = DateTime.UtcNow.AddYears(1),
                     Status = "ACTIVE",
-                    PaymentMethod = "QR", // From payment callback
+                    PaymentMethod = !string.IsNullOrEmpty(paymentCallback.PaymentMethod) 
+                                    ? paymentCallback.PaymentMethod 
+                                    : "Unknown", // Use actual payment method from callback
                     Amount = paymentCallback.Amount,
                     TransactionId = Guid.Parse(paymentCallback.TransactionId),
                     TimeOfPayment = paymentCallback.Timestamp,

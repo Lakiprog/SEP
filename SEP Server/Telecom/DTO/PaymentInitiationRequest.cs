@@ -33,5 +33,6 @@ namespace Telecom.DTO
         public string CustomerEmail { get; set; } = string.Empty;
         public string CustomerName { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty; // Added to track actual payment method
     }
 }

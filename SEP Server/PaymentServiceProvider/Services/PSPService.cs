@@ -369,7 +369,7 @@ namespace PaymentServiceProvider.Services
                 {
                     TransactionId = transaction.MerchantOrderId.ToString(),
                     IsPaid = true,
-                    PaymentMethod = "QR", // This should come from transaction
+                    PaymentMethod = transaction.PaymentType?.Type ?? "Unknown", // Get actual payment method from transaction
                     StatusMessage = callback.StatusMessage ?? "Payment completed successfully"
                 };
 
