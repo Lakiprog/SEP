@@ -1,14 +1,32 @@
 using BitcoinPaymentService.Services;
+using BitcoinPaymentService.Interfaces;
+using BitcoinPaymentService.Models;
 using Consul;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowCryptoFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:3003", "https://localhost:3003")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddControllers();
 
-// Add HttpClient for Bitcoin service
-builder.Services.AddHttpClient<BitcoinService>();
+// Configure CoinPayments settings
+builder.Services.Configure<CoinPaymentsConfig>(
+    builder.Configuration.GetSection("CoinPayments"));
+
+// Add HttpClient for CoinPayments service
+builder.Services.AddHttpClient<ICoinPaymentsService, CoinPaymentsService>();
 
 // Add Consul
 builder.Services.AddSingleton<IConsulClient>(provider =>
@@ -20,12 +38,15 @@ builder.Services.AddSingleton<IConsulClient>(provider =>
     return new ConsulClient(consulConfig);
 });
 
-// Add Bitcoin service
-builder.Services.AddScoped<BitcoinService>();
+// Add CoinPayments service
+builder.Services.AddScoped<ICoinPaymentsService, CoinPaymentsService>();
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+
+// CORS must be before HTTPS redirection to handle preflight requests
+app.UseCors("AllowCryptoFrontend");
 
 app.UseHttpsRedirection();
 

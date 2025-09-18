@@ -18,7 +18,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalhost", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:3001", "https://localhost:3000", "https://localhost:3001") // Allow your frontend to make requests
+        policy.WithOrigins("http://localhost:3000", "http://localhost:3001", "http://localhost:3003", "https://localhost:3000", "https://localhost:3001", "https://localhost:3003") // Allow your frontend to make requests
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // Allow credentials for authenticated requests

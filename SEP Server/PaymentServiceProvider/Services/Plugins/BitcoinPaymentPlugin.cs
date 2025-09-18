@@ -28,67 +28,58 @@ namespace PaymentServiceProvider.Services.Plugins
         {
             try
             {
-                // Get Bitcoin service URL from Consul
-                var bitcoinServiceUrl = await _serviceDiscovery.GetServiceUrlAsync("bitcoin-payment-service") ?? _fallbackUrl;
+                _logger.LogInformation("Processing Bitcoin payment for transaction {TransactionId}", transaction.PSPTransactionId);
 
-                // Create Bitcoin payment through the Bitcoin service
-                var bitcoinPaymentRequest = new
+                // Generate crypto-frontend URL with payment parameters
+                var cryptoFrontendUrl = "http://localhost:3003";
+
+                // Create URL parameters for the crypto payment
+                var paymentParams = new Dictionary<string, string>
                 {
-                    Amount = request.Amount,
-                    OrderId = transaction.PSPTransactionId,
-                    ReturnUrl = request.ReturnURL ?? "/"
+                    ["amount"] = request.Amount.ToString("F2"),
+                    ["currency"] = request.Currency,
+                    ["orderId"] = transaction.PSPTransactionId,
+                    ["merchantName"] = transaction.WebShopClient?.Name ?? "Unknown Merchant",
+                    ["returnUrl"] = request.ReturnURL ?? "/",
+                    ["cancelUrl"] = request.CancelURL ?? "/",
+                    ["callbackUrl"] = "https://localhost:5000/api/payment-callback/bitcoin",
+                    ["pspTransactionId"] = transaction.PSPTransactionId
                 };
 
-                var requestJson = JsonSerializer.Serialize(bitcoinPaymentRequest);
-                var content = new StringContent(requestJson, System.Text.Encoding.UTF8, "application/json");
+                // Build query string
+                var queryString = string.Join("&", paymentParams.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
+                var redirectUrl = $"{cryptoFrontendUrl}/payment?{queryString}";
 
-                var response = await _httpClient.PostAsync($"{bitcoinServiceUrl}/api/Bitcoin/create-payment", content);
+                _logger.LogInformation("Generated crypto payment URL: {PaymentUrl}", redirectUrl);
 
-                if (response.IsSuccessStatusCode)
+                return new PaymentResponse
                 {
-                    var responseJson = await response.Content.ReadAsStringAsync();
-                    var bitcoinResponse = JsonSerializer.Deserialize<JsonElement>(responseJson);
-
-                    var paymentId = bitcoinResponse.GetProperty("paymentId").GetString();
-                    var bitcoinAddress = bitcoinResponse.GetProperty("bitcoinAddress").GetString();
-                    var amountBtc = bitcoinResponse.GetProperty("amountBtc").GetDecimal();
-                    var qrCode = bitcoinResponse.GetProperty("qrCode").GetString();
-
-                    return new PaymentResponse
+                    Success = true,
+                    Message = "Redirecting to cryptocurrency payment",
+                    PaymentUrl = redirectUrl,
+                    PSPTransactionId = transaction.PSPTransactionId,
+                    TransactionId = transaction.PSPTransactionId,
+                    AvailablePaymentMethods = new List<PaymentMethod>
                     {
-                        Success = true,
-                        Message = "Bitcoin payment address generated successfully",
-                        PaymentUrl = $"{bitcoinServiceUrl}/payment/bitcoin/{paymentId}",
-                        AvailablePaymentMethods = new List<PaymentMethod>
+                        new PaymentMethod
                         {
-                            new PaymentMethod
-                            {
-                                Name = "Bitcoin Payment",
-                                Type = "bitcoin_address",
-                                Description = $"Send {amountBtc:F8} BTC to: {bitcoinAddress}",
-                                IsEnabled = true
-                            }
+                            Name = "Cryptocurrency Payment",
+                            Type = "crypto",
+                            Description = "Pay with Bitcoin, Ethereum, Litecoin, or Bitcoin Cash",
+                            IsEnabled = true,
+                            IconUrl = "/icons/crypto.svg"
                         }
-                    };
-                }
-                else
-                {
-                    _logger.LogError("Bitcoin service returned error: {StatusCode}", response.StatusCode);
-                    return new PaymentResponse
-                    {
-                        Success = false,
-                        Message = "Bitcoin payment service unavailable",
-                        ErrorCode = "BITCOIN_SERVICE_UNAVAILABLE"
-                    };
-                }
+                    }
+                };
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error processing Bitcoin payment for transaction {TransactionId}", transaction.PSPTransactionId);
                 return new PaymentResponse
                 {
                     Success = false,
-                    Message = $"Bitcoin payment processing error: {ex.Message}",
-                    ErrorCode = "BITCOIN_PROCESSING_ERROR"
+                    Message = $"Cryptocurrency payment processing error: {ex.Message}",
+                    ErrorCode = "CRYPTO_PROCESSING_ERROR"
                 };
             }
         }
@@ -100,8 +91,8 @@ namespace PaymentServiceProvider.Services.Plugins
                 // Get Bitcoin service URL from Consul
                 var bitcoinServiceUrl = await _serviceDiscovery.GetServiceUrlAsync("bitcoin-payment-service") ?? _fallbackUrl;
 
-                // Query Bitcoin service for payment status
-                var response = await _httpClient.GetAsync($"{bitcoinServiceUrl}/api/Bitcoin/payment-status/{externalTransactionId}");
+                // Query Bitcoin service for payment status using the new API
+                var response = await _httpClient.GetAsync($"{bitcoinServiceUrl}/api/bitcoin/payment-status/{externalTransactionId}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -112,8 +103,11 @@ namespace PaymentServiceProvider.Services.Plugins
                     var transactionStatus = status?.ToLower() switch
                     {
                         "completed" => TransactionStatus.Completed,
-                        "pending" => TransactionStatus.Pending,
+                        "confirmed" => TransactionStatus.Processing,
+                        "expired" => TransactionStatus.Failed,
                         "failed" => TransactionStatus.Failed,
+                        "cancelled" => TransactionStatus.Cancelled,
+                        "pending" => TransactionStatus.Pending,
                         _ => TransactionStatus.Pending
                     };
 
@@ -121,7 +115,7 @@ namespace PaymentServiceProvider.Services.Plugins
                     {
                         PSPTransactionId = externalTransactionId,
                         Status = transactionStatus,
-                        StatusMessage = $"Bitcoin payment {status}",
+                        StatusMessage = $"Cryptocurrency payment {status}",
                         ExternalTransactionId = externalTransactionId,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -131,19 +125,19 @@ namespace PaymentServiceProvider.Services.Plugins
                 {
                     PSPTransactionId = externalTransactionId,
                     Status = TransactionStatus.Pending,
-                    StatusMessage = "Unable to verify Bitcoin payment status",
+                    StatusMessage = "Unable to verify cryptocurrency payment status",
                     ExternalTransactionId = externalTransactionId,
                     UpdatedAt = DateTime.UtcNow
                 };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting Bitcoin payment status for transaction {TransactionId}", externalTransactionId);
+                _logger.LogError(ex, "Error getting cryptocurrency payment status for transaction {TransactionId}", externalTransactionId);
                 return new PaymentStatusUpdate
                 {
                     PSPTransactionId = externalTransactionId,
                     Status = TransactionStatus.Pending,
-                    StatusMessage = "Error checking Bitcoin payment status",
+                    StatusMessage = "Error checking cryptocurrency payment status",
                     ExternalTransactionId = externalTransactionId,
                     UpdatedAt = DateTime.UtcNow
                 };
@@ -170,37 +164,44 @@ namespace PaymentServiceProvider.Services.Plugins
         {
             try
             {
-                // Process callback from Bitcoin service
-                var pspTransactionId = callbackData.GetValueOrDefault("pspTransactionId")?.ToString();
-                var externalTransactionId = callbackData.GetValueOrDefault("externalTransactionId")?.ToString();
+                // Process callback from crypto frontend/Bitcoin service
+                var pspTransactionId = callbackData.GetValueOrDefault("pspTransactionId")?.ToString()
+                                     ?? callbackData.GetValueOrDefault("orderId")?.ToString();
+                var paymentId = callbackData.GetValueOrDefault("paymentId")?.ToString();
+                var transactionId = callbackData.GetValueOrDefault("transactionId")?.ToString();
                 var status = callbackData.GetValueOrDefault("status")?.ToString();
                 var amount = Convert.ToDecimal(callbackData.GetValueOrDefault("amount", 0));
-                var confirmations = Convert.ToInt32(callbackData.GetValueOrDefault("confirmations", 0));
+                var currency = callbackData.GetValueOrDefault("currency")?.ToString() ?? "BTC";
 
                 var transactionStatus = status?.ToLower() switch
                 {
-                    "confirmed" when confirmations >= 6 => TransactionStatus.Completed,
-                    "confirmed" when confirmations < 6 => TransactionStatus.Processing,
+                    "completed" => TransactionStatus.Completed,
+                    "confirmed" => TransactionStatus.Processing,
+                    "expired" => TransactionStatus.Failed,
                     "failed" => TransactionStatus.Failed,
                     "cancelled" => TransactionStatus.Cancelled,
                     _ => TransactionStatus.Pending
                 };
 
+                _logger.LogInformation("Processing crypto callback for PSP transaction {PSPTransactionId}, status: {Status}",
+                    pspTransactionId, status);
+
                 return new PaymentCallback
                 {
                     PSPTransactionId = pspTransactionId,
-                    ExternalTransactionId = externalTransactionId,
+                    ExternalTransactionId = paymentId ?? transactionId,
                     Status = transactionStatus,
-                    StatusMessage = callbackData.GetValueOrDefault("message")?.ToString() ?? $"Bitcoin transaction with {confirmations} confirmations",
+                    StatusMessage = callbackData.GetValueOrDefault("message")?.ToString() ?? $"Cryptocurrency payment {status}",
                     Amount = amount,
-                    Currency = "BTC",
+                    Currency = currency,
                     Timestamp = DateTime.UtcNow,
                     AdditionalData = callbackData
                 };
             }
             catch (Exception ex)
             {
-                throw new Exception($"Error processing Bitcoin callback: {ex.Message}");
+                _logger.LogError(ex, "Error processing cryptocurrency callback");
+                throw new Exception($"Error processing cryptocurrency callback: {ex.Message}");
             }
         }
 
