@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Row, Col, Card, CardBody, CardTitle, CardText, Button, Modal, ModalHeader, ModalBody, ModalFooter, FormGroup, Label, Input, Badge, TabContent, TabPane, Nav, NavItem, NavLink, Alert, Spinner } from 'reactstrap';
 import { toast } from 'react-toastify';
 import axios from 'axios';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PackageDealsUser = () => {
+  const { user } = useAuth();
   const [packages, setPackages] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,11 +15,6 @@ const PackageDealsUser = () => {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [years, setYears] = useState(1);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
-
-  useEffect(() => {
-    fetchPackages();
-    fetchSubscriptions();
-  }, []);
 
   const fetchPackages = async () => {
     try {
@@ -31,16 +28,32 @@ const PackageDealsUser = () => {
     }
   };
 
-  const fetchSubscriptions = async () => {
+  const fetchSubscriptions = useCallback(async () => {
     try {
-      const userId = 1; // Mock user ID - in real app this would come from auth context
-      const response = await axios.get(`https://localhost:5001/api/telecom/packagedeal/subscriptions/${userId}`);
-      setSubscriptions(response.data);
+      // Check if user is admin (SuperAdmin)
+      if (user?.userType === 'SuperAdmin') {
+        // For admin users, fetch all subscriptions
+        const response = await axios.get('https://localhost:5001/api/telecom/subscription/all-subscriptions');
+        setSubscriptions(response.data);
+      } else {
+        // For regular users, fetch only their subscriptions
+        const userId = user?.userId || 1; // Use actual user ID from auth context
+        const response = await axios.get(`https://localhost:5001/api/telecom/packagedeal/subscriptions/${userId}`);
+        setSubscriptions(response.data);
+      }
     } catch (err) {
       console.error('Error fetching subscriptions:', err);
       // Don't set error for subscriptions as it's not critical
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchPackages();
+  }, []);
+
+  useEffect(() => {
+    fetchSubscriptions();
+  }, [user, fetchSubscriptions]);
 
   const handleSubscribe = (pkg) => {
     setSelectedPackage(pkg);
@@ -57,7 +70,7 @@ const PackageDealsUser = () => {
 
       // Step 1: Pre-create subscription with PENDING status
       const subscriptionData = {
-        userId: 1, // Mock user ID - in real app this would come from auth context
+        userId: user?.userId || 1, // Use actual user ID from auth context
         packageId: selectedPackage.id,
         years: years,
         paymentMethod: 'Unknown' // Will be updated with actual payment method when payment is processed
@@ -74,7 +87,7 @@ const PackageDealsUser = () => {
 
       // Step 2: Initiate payment through PSP using the subscription's transaction ID
       const paymentData = {
-        userId: 1,
+        userId: user?.userId || 1,
         packageId: selectedPackage.id,
         years: years,
         amount: subscriptionResponse.data.amount,
@@ -202,31 +215,46 @@ const PackageDealsUser = () => {
               Browse available packages and subscribe to get started.
             </Alert>
           ) : (
-            <Row>
-              {subscriptions.map((subscription) => (
-                <Col key={subscription.id} md={6} lg={4} className="mb-4">
-                  <Card className="h-100 border-success">
-                    <CardBody>
-                      <CardTitle className="h6 text-success">
-                        <span className="me-2">✅</span>
-                        {subscription.package?.name}
-                      </CardTitle>
-                      <CardText>
-                        <strong>Status:</strong> {subscription.status}
-                        <br />
-                        <strong>Start Date:</strong> {new Date(subscription.startDate).toLocaleDateString()}
-                        <br />
-                        <strong>End Date:</strong> {new Date(subscription.endDate).toLocaleDateString()}
-                        <br />
-                        <strong>Payment Method:</strong> {subscription.paymentMethod}
-                        <br />
-                        <strong>Amount:</strong> ${subscription.amount}
-                      </CardText>
-                    </CardBody>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
+            <div>
+              {user?.userType === 'SuperAdmin' && (
+                <Alert color="info" fade={false} className="mb-4">
+                  <strong>Admin View:</strong> Showing all subscriptions in the system
+                </Alert>
+              )}
+              <Row>
+                {subscriptions.map((subscription) => (
+                  <Col key={subscription.id} md={6} lg={4} className="mb-4">
+                    <Card className="h-100 border-success">
+                      <CardBody>
+                        <CardTitle className="h6 text-success">
+                          <span className="me-2">✅</span>
+                          {subscription.package?.name}
+                        </CardTitle>
+                        <CardText>
+                          {user?.userType === 'SuperAdmin' && (
+                            <>
+                              <strong>User ID:</strong> {subscription.userId}
+                              <br />
+                              <strong>Username:</strong> {subscription.user?.username || 'N/A'}
+                              <br />
+                            </>
+                          )}
+                          <strong>Status:</strong> {subscription.status}
+                          <br />
+                          <strong>Start Date:</strong> {new Date(subscription.startDate).toLocaleDateString()}
+                          <br />
+                          <strong>End Date:</strong> {new Date(subscription.endDate).toLocaleDateString()}
+                          <br />
+                          <strong>Payment Method:</strong> {subscription.paymentMethod}
+                          <br />
+                          <strong>Amount:</strong> ${subscription.amount}
+                        </CardText>
+                      </CardBody>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </div>
           )}
         </TabPane>
       </TabContent>

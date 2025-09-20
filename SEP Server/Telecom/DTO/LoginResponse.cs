@@ -6,6 +6,7 @@ namespace Telecom.DTO
         public string UserType { get; set; } = null!;
         public string Username { get; set; } = null!;
         public string Email { get; set; } = null!;
+        public int UserId { get; set; }
         public DateTime ExpiresAt { get; set; }
     }
 }

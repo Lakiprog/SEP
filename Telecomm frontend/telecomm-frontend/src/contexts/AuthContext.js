@@ -46,12 +46,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (loginResponse) => {
-    const { token, userType, username, email, expiresAt } = loginResponse;
+    const { token, userType, username, email, userId, expiresAt } = loginResponse;
 
     const userData = {
       userType,
       username,
       email,
+      userId,
       expiresAt
     };
 

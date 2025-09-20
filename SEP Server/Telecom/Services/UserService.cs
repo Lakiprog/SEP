@@ -50,6 +50,7 @@ namespace Telecom.Services
                 UserType = user.UserType.ToString(),
                 Username = user.Username,
                 Email = user.Email,
+                UserId = user.Id,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(expirationInMinutes)
             };
         }

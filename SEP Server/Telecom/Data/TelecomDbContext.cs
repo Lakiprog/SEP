@@ -33,6 +33,13 @@ namespace Telecom.Data
                 .HasForeignKey(s => s.PackageId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Configure Subscription - User relationship
+            modelBuilder.Entity<Subscription>()
+                .HasOne(s => s.User)
+                .WithMany()
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(TelecomDbContext).Assembly);
         }
     }
