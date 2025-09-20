@@ -41,6 +41,7 @@ builder.Services.AddSingleton<IConsulClient>(provider =>
 // Add CoinPayments service
 builder.Services.AddScoped<ICoinPaymentsService, CoinPaymentsService>();
 
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

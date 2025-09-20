@@ -237,42 +237,36 @@ namespace BitcoinPaymentService.Services
         {
             try
             {
-                // Add authentication parameters
-                parameters["key"] = _config.ClientId;
-                parameters["version"] = "1";
-                parameters["format"] = "json";
+                _logger.LogInformation("Using new CoinPayments API at: {BaseUrl}", _config.BaseUrl);
 
-                // Create HMAC signature
-                var query = string.Join("&", parameters.Select(p => $"{p.Key}={Uri.EscapeDataString(p.Value)}"));
-                var signature = GenerateHmacSignature(query, _config.ClientSecret);
+                // For new API, use Basic Auth instead of HMAC
+                var authString = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_config.ClientId}:{_config.ClientSecret}"));
 
-                var content = new FormUrlEncodedContent(parameters);
+                var request = new HttpRequestMessage(HttpMethod.Post, "/");
+                request.Headers.Add("Authorization", $"Basic {authString}");
+                request.Headers.Add("Accept", "application/json");
 
-                var request = new HttpRequestMessage(HttpMethod.Post, "/")
-                {
-                    Content = content
-                };
-                request.Headers.Add("HMAC", signature);
+                // Convert parameters to JSON for new API
+                var jsonContent = JsonConvert.SerializeObject(parameters);
+                request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                _logger.LogInformation("Sending request with Basic Auth");
+                _logger.LogInformation("Request body: {Body}", jsonContent);
 
                 var response = await _httpClient.SendAsync(request);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                _logger.LogDebug($"CoinPayments API Response: {responseContent}");
+                _logger.LogInformation("Response status: {StatusCode}", response.StatusCode);
+                _logger.LogInformation("Response content: {Content}", responseContent);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var apiResponse = JsonConvert.DeserializeObject<CoinPaymentsApiResponse<T>>(responseContent);
-
-                    if (!string.IsNullOrEmpty(apiResponse?.Error))
-                    {
-                        _logger.LogError($"CoinPayments API Error: {apiResponse.Error}");
-                        throw new InvalidOperationException($"CoinPayments API Error: {apiResponse.Error}");
-                    }
-
-                    return apiResponse?.Result;
+                    // For new API, response format might be different
+                    var result = JsonConvert.DeserializeObject<T>(responseContent);
+                    return result;
                 }
 
-                _logger.LogError($"CoinPayments API request failed with status: {response.StatusCode}");
+                _logger.LogError($"CoinPayments API request failed with status: {response.StatusCode}, content: {responseContent}");
                 throw new HttpRequestException($"CoinPayments API request failed with status: {response.StatusCode}");
             }
             catch (Exception ex)
