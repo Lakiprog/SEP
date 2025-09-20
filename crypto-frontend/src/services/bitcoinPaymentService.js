@@ -51,5 +51,49 @@ export const bitcoinPaymentService = {
       console.error('Bitcoin payment service is not available:', error);
       return null;
     }
+  },
+
+  // Manual status check - calls the new endpoint
+  async checkTransactionStatusManually(transactionId) {
+    try {
+      const response = await api.post(`/check-transaction-status/${transactionId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking transaction status manually:', error);
+      throw new Error(error.response?.data?.error || 'Failed to check transaction status');
+    }
+  },
+
+  // Send callback to PSP for completed/failed transaction
+  async sendPSPCallback(transactionData, isSuccessful, message = '') {
+    try {
+      // This would be the PSP callback endpoint - adjust URL as needed
+      const pspCallbackUrl = 'https://localhost:7001/api/psp/payment-callback'; // Adjust to your PSP URL
+
+      const callbackData = {
+        transactionId: transactionData.transaction_id || transactionData.transactionId,
+        paymentId: transactionData.paymentId,
+        buyerEmail: transactionData.buyer_email || transactionData.buyerEmail,
+        amount: transactionData.amount,
+        currency: transactionData.currency1 || transactionData.currency,
+        status: isSuccessful ? 'completed' : 'failed',
+        telecomServiceId: transactionData.telecom_service_id || transactionData.telecomServiceId,
+        completed: isSuccessful,
+        message: message || (isSuccessful ? 'Payment completed successfully' : 'Payment failed or was cancelled'),
+        timestamp: new Date().toISOString()
+      };
+
+      const response = await axios.post(pspCallbackUrl, callbackData, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error sending PSP callback:', error);
+      throw new Error(error.response?.data?.error || 'Failed to send PSP callback');
+    }
   }
 };

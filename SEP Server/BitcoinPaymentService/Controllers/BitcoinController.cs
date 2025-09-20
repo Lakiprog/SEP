@@ -3,6 +3,8 @@ using BitcoinPaymentService.Interfaces;
 using BitcoinPaymentService.Models;
 using BitcoinPaymentService.Data.Repositories;
 using QRCoder;
+using System.Text.Json;
+using System.Text;
 
 namespace BitcoinPaymentService.Controllers
 {
@@ -13,12 +15,16 @@ namespace BitcoinPaymentService.Controllers
         private readonly ILogger<BitcoinController> _logger;
         private readonly ICoinPaymentsService _coinPaymentsService;
         private readonly ITransactionRepository _transactionRepository;
+        private readonly HttpClient _httpClient;
+        private readonly IConfiguration _configuration;
 
-        public BitcoinController(ILogger<BitcoinController> logger, ICoinPaymentsService coinPaymentsService, ITransactionRepository transactionRepository)
+        public BitcoinController(ILogger<BitcoinController> logger, ICoinPaymentsService coinPaymentsService, ITransactionRepository transactionRepository, HttpClient httpClient, IConfiguration configuration)
         {
             _logger = logger;
             _coinPaymentsService = coinPaymentsService;
             _transactionRepository = transactionRepository;
+            _httpClient = httpClient;
+            _configuration = configuration;
         }
 
         [HttpPost("create-invoice")]
@@ -423,6 +429,189 @@ namespace BitcoinPaymentService.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting all transactions");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        public async Task UpdateTransactionStatusAsync(BitcoinPaymentService.Data.Entities.Transaction transactionForUpdate)
+        {
+            var transaction = await _transactionRepository.GetByTransactionIdAsync(transactionForUpdate.TransactionId);
+
+            if (transaction != null && transaction.Status == TransactionStatus.COMPLETED)
+            {
+                _logger.LogInformation("Transakcija je već završena za ID: {TransactionId}", transaction.TransactionId);
+                return;
+            }
+
+            if (transaction != null)
+            {
+                transaction.Status = TransactionStatus.COMPLETED;
+                transaction.UpdatedAt = DateTime.UtcNow;
+
+                await _transactionRepository.UpdateAsync(transaction);
+                _logger.LogInformation("Transakcija je ažurirana u bazi sa statusom 'COMPLETED'");
+                await NotifyWebShopAsync(transaction.BuyerEmail, transaction.TelecomServiceId, true, "");
+            }
+        }
+
+        public async Task NotifyWebShopAsync(string buyerEmail, Guid telecomServiceId, bool completed, string message)
+        {
+            try
+            {
+                var savePurchasedServiceRequestDto = new SavePurchasedServiceRequestDto
+                {
+                    BuyerEmail = buyerEmail,
+                    TelecomServiceId = telecomServiceId,
+                    Completed = completed,
+                    Message = message
+                };
+
+                var pspServiceUrl = _configuration["PSP:ServiceUrl"];
+                var json = JsonSerializer.Serialize(savePurchasedServiceRequestDto);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync($"{pspServiceUrl}/web-shop", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation("RESPONSE: {ResponseBody}", responseBody);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to notify webshop. Status: {StatusCode}", response.StatusCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to notify webshop");
+                throw new InvalidOperationException("Failed to notify webshop", ex);
+            }
+        }
+
+        public async Task HandleExpiredTransactionAsync(BitcoinPaymentService.Data.Entities.Transaction transactionForUpdate)
+        {
+            _logger.LogInformation("Transakcija je istekla ili otkazana! Ažuriram bazu za txnId: {TransactionId}", transactionForUpdate.TransactionId);
+            var transaction = await _transactionRepository.GetByTransactionIdAsync(transactionForUpdate.TransactionId);
+
+            if (transaction != null)
+            {
+                transaction.Status = TransactionStatus.CANCELLED;
+                transaction.UpdatedAt = DateTime.UtcNow;
+                await _transactionRepository.UpdateAsync(transaction);
+
+                string message = "The requested transaction has expired or was cancelled. \n If you wish to use the service, please try again.";
+
+                await NotifyWebShopAsync(transaction.BuyerEmail, transaction.TelecomServiceId, false, message);
+            }
+        }
+
+        public async Task CompleteTransactionAsync(string responseBody, BitcoinPaymentService.Data.Entities.Transaction transaction)
+        {
+            try
+            {
+                var jsonDocument = JsonDocument.Parse(responseBody);
+                var root = jsonDocument.RootElement;
+
+                if (root.TryGetProperty("result", out var resultElement))
+                {
+                    var status = resultElement.TryGetProperty("status", out var statusElement) ? statusElement.GetInt32() : 0;
+                    var statusText = resultElement.TryGetProperty("status_text", out var statusTextElement) ? statusTextElement.GetString() : "";
+
+                    _logger.LogInformation("Proveravam status: {Status} - {StatusText}", status, statusText);
+
+                    if (status == 100 && "Complete".Equals(statusText, StringComparison.OrdinalIgnoreCase))
+                    {
+                        await UpdateTransactionStatusAsync(transaction);
+                    }
+                    else if (status < 0 || "Cancelled / Timed Out".Equals(statusText, StringComparison.OrdinalIgnoreCase))
+                    {
+                        await HandleExpiredTransactionAsync(transaction);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error completing transaction");
+            }
+        }
+
+        public async Task<string?> CheckTransactionStatusAsync(string txnId)
+        {
+            try
+            {
+                var parameters = new Dictionary<string, string>
+                {
+                    ["version"] = "1",
+                    ["cmd"] = "get_tx_info",
+                    ["key"] = "your_api_key", // TODO: Move to configuration
+                    ["txid"] = txnId
+                };
+
+                // TODO: Implement HMAC signature generation
+                var hmacSignature = ""; // generateHmac(apiSecret, parameters);
+
+                var requestBody = string.Join("&", parameters.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
+
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://www.coinpayments.net/api.php")
+                {
+                    Content = new StringContent(requestBody, Encoding.UTF8, "application/x-www-form-urlencoded")
+                };
+
+                request.Headers.Add("HMAC", hmacSignature);
+
+                var response = await _httpClient.SendAsync(request);
+
+                _logger.LogInformation("Response Code: {StatusCode}", response.StatusCode);
+
+                var responseBody = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("Response Body: {ResponseBody}", responseBody);
+
+                return responseBody;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking transaction status");
+                return null;
+            }
+        }
+
+        [HttpPost("update-transaction-status")]
+        public async Task<IActionResult> UpdateTransactionStatus([FromBody] BitcoinPaymentService.Data.Entities.Transaction transactionForUpdate)
+        {
+            try
+            {
+                await UpdateTransactionStatusAsync(transactionForUpdate);
+                return Ok(new { message = "Transaction status updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating transaction status");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("check-transaction-status/{txnId}")]
+        public async Task<IActionResult> CheckTransactionStatus(string txnId)
+        {
+            try
+            {
+                var responseBody = await CheckTransactionStatusAsync(txnId);
+
+                if (responseBody != null)
+                {
+                    var transaction = await _transactionRepository.GetByTransactionIdAsync(txnId);
+                    if (transaction != null)
+                    {
+                        await CompleteTransactionAsync(responseBody, transaction);
+                    }
+                }
+
+                return Ok(new { response = responseBody });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking transaction status");
                 return BadRequest(new { error = ex.Message });
             }
         }

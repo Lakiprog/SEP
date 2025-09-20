@@ -17,6 +17,7 @@ const CryptoPayment = ({
   const [error, setError] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [serviceAvailable, setServiceAvailable] = useState(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
   const initializedRef = useRef(false);
 
   // Check if Bitcoin payment service is available
@@ -107,6 +108,63 @@ const CryptoPayment = ({
       });
     }
   }, [onPaymentExpired, paymentData]);
+
+  // Manual status check with PSP callback
+  const checkStatusManually = useCallback(async () => {
+    if (!paymentData?.transactionId || checkingStatus) return;
+
+    setCheckingStatus(true);
+    try {
+      // Call the new manual check endpoint
+      const result = await bitcoinPaymentService.checkTransactionStatusManually(paymentData.transactionId);
+
+      // Get updated status
+      const updatedStatus = await bitcoinPaymentService.getPaymentStatus(paymentData.transactionId);
+      const newStatus = updatedStatus.status.toLowerCase();
+
+      setPaymentStatus(newStatus);
+
+      // Send PSP callback based on status
+      if (newStatus === 'completed') {
+        // Successful transaction - send PSP callback
+        try {
+          await bitcoinPaymentService.sendPSPCallback(updatedStatus, true);
+          alert('✅ Plaćanje je uspešno! PSP je obavešten.');
+
+          if (onPaymentComplete) {
+            onPaymentComplete(updatedStatus);
+          }
+        } catch (callbackError) {
+          console.error('PSP callback failed:', callbackError);
+          alert('✅ Plaćanje je uspešno, ali ima problema sa obaveštavanjem PSP-a.');
+        }
+      } else if (newStatus === 'failed' || newStatus === 'cancelled' || newStatus === 'expired') {
+        // Failed transaction - send PSP callback
+        try {
+          const message = newStatus === 'expired' ? 'Transakcija je istekla' : 'Transakcija je otkazana ili neuspešna';
+          await bitcoinPaymentService.sendPSPCallback(updatedStatus, false, message);
+          alert('❌ Plaćanje nije uspešno. PSP je obavešten.');
+
+          if (newStatus === 'expired' && onPaymentExpired) {
+            onPaymentExpired(updatedStatus);
+          } else if (onPaymentFailed) {
+            onPaymentFailed(updatedStatus);
+          }
+        } catch (callbackError) {
+          console.error('PSP callback failed:', callbackError);
+          alert('❌ Plaćanje nije uspešno, takođe ima problema sa obaveštavanjem PSP-a.');
+        }
+      } else {
+        // Still pending
+        alert('⏳ Transakcija je još uvek u toku. Pokušajte ponovo za nekoliko minuta.');
+      }
+    } catch (error) {
+      console.error('Error checking status manually:', error);
+      alert('❌ Greška pri proveri statusa: ' + error.message);
+    } finally {
+      setCheckingStatus(false);
+    }
+  }, [paymentData?.transactionId, checkingStatus, onPaymentComplete, onPaymentExpired, onPaymentFailed]);
 
   // Start payment creation on component mount
   useEffect(() => {
@@ -206,6 +264,26 @@ const CryptoPayment = ({
                 amount={paymentData.amount}
                 currency={paymentData.currency}
               />
+
+              <div className="check-status-container">
+                <button
+                  onClick={checkStatusManually}
+                  disabled={checkingStatus}
+                  className="check-status-btn"
+                >
+                  {checkingStatus ? (
+                    <>
+                      <div className="mini-spinner"></div>
+                      Proverava se...
+                    </>
+                  ) : (
+                    '🔍 Proveri status'
+                  )}
+                </button>
+                <p className="check-status-help">
+                  Kliknite ovde da proverite da li je plaćanje uspešno završeno
+                </p>
+              </div>
             </>
           )}
 
@@ -370,6 +448,63 @@ const CryptoPayment = ({
 
         .retry-btn:hover {
           background: #0056b3;
+        }
+
+        .check-status-container {
+          text-align: center;
+          margin: 20px 0;
+          padding: 15px;
+          background: #f8f9fa;
+          border-radius: 8px;
+          border: 1px solid #dee2e6;
+        }
+
+        .check-status-btn {
+          background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+          color: white;
+          border: none;
+          padding: 12px 24px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 16px;
+          font-weight: 600;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin: 0 auto 10px;
+          min-width: 180px;
+          box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+        }
+
+        .check-status-btn:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+          background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+        }
+
+        .check-status-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+        }
+
+        .mini-spinner {
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top: 2px solid white;
+          border-radius: 50%;
+          width: 16px;
+          height: 16px;
+          animation: spin 1s linear infinite;
+        }
+
+        .check-status-help {
+          margin: 0;
+          font-size: 14px;
+          color: #6c757d;
+          font-style: italic;
         }
 
         .payment-info {

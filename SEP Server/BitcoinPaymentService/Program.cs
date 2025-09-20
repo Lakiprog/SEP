@@ -37,6 +37,9 @@ builder.Services.Configure<CoinPaymentsConfig>(
 // Add HttpClient for CoinPayments service
 builder.Services.AddHttpClient<ICoinPaymentsService, CoinPaymentsService>();
 
+// Add general HttpClient
+builder.Services.AddHttpClient();
+
 // Add Consul
 builder.Services.AddSingleton<IConsulClient>(provider =>
 {
