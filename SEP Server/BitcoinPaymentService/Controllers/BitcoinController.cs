@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using BitcoinPaymentService.Interfaces;
 using BitcoinPaymentService.Models;
+using BitcoinPaymentService.Data.Repositories;
 using QRCoder;
 
 namespace BitcoinPaymentService.Controllers
@@ -11,12 +12,13 @@ namespace BitcoinPaymentService.Controllers
     {
         private readonly ILogger<BitcoinController> _logger;
         private readonly ICoinPaymentsService _coinPaymentsService;
-        private static readonly Dictionary<string, BitcoinPayment> _payments = new();
+        private readonly ITransactionRepository _transactionRepository;
 
-        public BitcoinController(ILogger<BitcoinController> logger, ICoinPaymentsService coinPaymentsService)
+        public BitcoinController(ILogger<BitcoinController> logger, ICoinPaymentsService coinPaymentsService, ITransactionRepository transactionRepository)
         {
             _logger = logger;
             _coinPaymentsService = coinPaymentsService;
+            _transactionRepository = transactionRepository;
         }
 
         [HttpPost("create-invoice")]
@@ -90,21 +92,29 @@ namespace BitcoinPaymentService.Controllers
                     return BadRequest(new { error = "Failed to create invoice" });
                 }
 
-                var payment = new BitcoinPayment
+                // Check if transaction already exists to avoid duplicates
+                var existingTransaction = await _transactionRepository.GetByTransactionIdAsync(invoiceResponse.Id);
+                if (existingTransaction == null)
                 {
-                    PaymentId = paymentId,
-                    OrderId = request.OrderId,
-                    Amount = request.Amount,
-                    BitcoinAddress = "mkDukuskLXmotjurnWXYsyxzN7G6rBXFec",
-                    Status = "PENDING",
-                    CreatedAt = DateTime.UtcNow,
-                    ExpiresAt = dueDate,
-                    ReturnUrl = request.ReturnUrl,
-                    TransactionId = invoiceResponse.Id,
-                    Currency = "LTCT"
-                };
+                    // Save transaction to database
+                    var dbTransaction = new BitcoinPaymentService.Data.Entities.Transaction
+                    {
+                        TransactionId = invoiceResponse.Id,
+                        BuyerEmail = request.BuyerEmail,
+                        Currency1 = "USD",
+                        Currency2 = "LTCT",
+                        Amount = request.Amount,
+                        Status = TransactionStatus.PENDING,
+                        TelecomServiceId = Guid.NewGuid() // Placeholder - should be passed from request
+                    };
 
-                _payments[paymentId] = payment;
+                    await _transactionRepository.CreateAsync(dbTransaction);
+                    _logger.LogInformation("Created new invoice transaction: {TransactionId}", invoiceResponse.Id);
+                }
+                else
+                {
+                    _logger.LogInformation("Invoice transaction already exists: {TransactionId}", invoiceResponse.Id);
+                }
 
                 return Ok(new
                 {
@@ -203,21 +213,29 @@ namespace BitcoinPaymentService.Controllers
                     qrCodeImage = "";
                 }
 
-                var payment = new BitcoinPayment
+                // Check if transaction already exists to avoid duplicates
+                var existingTransaction = await _transactionRepository.GetByTransactionIdAsync(transaction.TxnId);
+                if (existingTransaction == null)
                 {
-                    PaymentId = paymentId,
-                    OrderId = request.OrderId,
-                    Amount = amountInLTCT, // Store LTCT amount
-                    BitcoinAddress = transaction.Address,
-                    Status = "PENDING",
-                    CreatedAt = DateTime.UtcNow,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(30),
-                    ReturnUrl = request.ReturnUrl,
-                    TransactionId = transaction.TxnId,
-                    Currency = request.Currency ?? "LTCT"
-                };
+                    // Save transaction to database
+                    var dbTransaction = new BitcoinPaymentService.Data.Entities.Transaction
+                    {
+                        TransactionId = transaction.TxnId,
+                        BuyerEmail = request.BuyerEmail ?? "user@example.com",
+                        Currency1 = "USD",
+                        Currency2 = request.Currency ?? "LTCT",
+                        Amount = amountInLTCT,
+                        Status = TransactionStatus.PENDING,
+                        TelecomServiceId = request.TelecomServiceId ?? Guid.NewGuid()
+                    };
 
-                _payments[paymentId] = payment;
+                    await _transactionRepository.CreateAsync(dbTransaction);
+                    _logger.LogInformation("Created new QR payment transaction: {TransactionId}", transaction.TxnId);
+                }
+                else
+                {
+                    _logger.LogInformation("QR payment transaction already exists: {TransactionId}", transaction.TxnId);
+                }
 
                 _logger.LogInformation("Successfully created QR payment: PaymentId={PaymentId}, TransactionId={TransactionId}, USD={UsdAmount}, LTCT={LtctAmount}",
                     paymentId, transaction.TxnId, request.Amount, amountInLTCT);
@@ -246,58 +264,60 @@ namespace BitcoinPaymentService.Controllers
             }
         }
 
-        [HttpGet("payment-status/{paymentId}")]
-        public async Task<IActionResult> GetPaymentStatus(string paymentId)
+        [HttpGet("payment-status/{transactionId}")]
+        public async Task<IActionResult> GetPaymentStatus(string transactionId)
         {
             try
             {
-                if (!_payments.ContainsKey(paymentId))
+                var transaction = await _transactionRepository.GetByTransactionIdAsync(transactionId);
+
+                if (transaction == null)
                 {
-                    return NotFound(new { error = "Payment not found" });
+                    return NotFound(new { error = "Transaction not found" });
                 }
 
-                var payment = _payments[paymentId];
-
                 // Check if payment has expired (30 minutes timeout)
-                if (DateTime.UtcNow > payment.ExpiresAt && payment.Status == "PENDING")
+                var expiredAt = transaction.CreatedAt.AddMinutes(30);
+                if (DateTime.UtcNow > expiredAt && transaction.Status == TransactionStatus.PENDING)
                 {
-                    payment.Status = "EXPIRED";
-                    _logger.LogInformation($"Payment {paymentId} has expired");
+                    transaction.Status = TransactionStatus.CANCELLED;
+                    transaction.UpdatedAt = DateTime.UtcNow;
+                    await _transactionRepository.UpdateAsync(transaction);
+                    _logger.LogInformation("Transaction {TransactionId} has expired", transactionId);
                 }
 
                 // Check payment status via CoinPayments API if not expired
-                if (payment.Status == "PENDING" && !string.IsNullOrEmpty(payment.TransactionId))
+                if (transaction.Status == TransactionStatus.PENDING)
                 {
-                    var status = await _coinPaymentsService.GetPaymentStatusAsync(payment.TransactionId);
+                    var status = await _coinPaymentsService.GetPaymentStatusAsync(transactionId);
 
                     if (status == "expired")
                     {
-                        payment.Status = "EXPIRED";
+                        transaction.Status = TransactionStatus.CANCELLED;
+                        transaction.UpdatedAt = DateTime.UtcNow;
+                        await _transactionRepository.UpdateAsync(transaction);
                     }
                     else if (status == "completed")
                     {
-                        payment.Status = "COMPLETED";
-                        payment.CompletedAt = DateTime.UtcNow;
-                    }
-                    else if (status == "confirmed")
-                    {
-                        payment.Status = "CONFIRMED";
+                        transaction.Status = TransactionStatus.COMPLETED;
+                        transaction.UpdatedAt = DateTime.UtcNow;
+                        await _transactionRepository.UpdateAsync(transaction);
                     }
                 }
 
                 return Ok(new
                 {
-                    payment_id = payment.PaymentId,
-                    transaction_id = payment.TransactionId,
-                    order_id = payment.OrderId,
-                    amount = payment.Amount,
-                    currency = payment.Currency,
-                    address = payment.BitcoinAddress,
-                    status = payment.Status,
-                    created_at = payment.CreatedAt,
-                    expires_at = payment.ExpiresAt,
-                    completed_at = payment.CompletedAt,
-                    is_expired = DateTime.UtcNow > payment.ExpiresAt
+                    transaction_id = transaction.TransactionId,
+                    buyer_email = transaction.BuyerEmail,
+                    amount = transaction.Amount,
+                    currency1 = transaction.Currency1,
+                    currency2 = transaction.Currency2,
+                    status = transaction.Status.ToString(),
+                    created_at = transaction.CreatedAt,
+                    updated_at = transaction.UpdatedAt,
+                    expires_at = transaction.CreatedAt.AddMinutes(30),
+                    is_expired = DateTime.UtcNow > transaction.CreatedAt.AddMinutes(30),
+                    telecom_service_id = transaction.TelecomServiceId
                 });
             }
             catch (Exception ex)
@@ -308,41 +328,44 @@ namespace BitcoinPaymentService.Controllers
         }
 
         [HttpPost("coinpayments-webhook")]
-        public Task<IActionResult> CoinPaymentsWebhook([FromBody] CoinPaymentsWebhookRequest request)
+        public async Task<IActionResult> CoinPaymentsWebhook([FromBody] CoinPaymentsWebhookRequest request)
         {
             try
             {
-                // Find payment by transaction ID
-                var payment = _payments.Values.FirstOrDefault(p => p.TransactionId == request.TxnId);
+                // Find transaction by transaction ID
+                var transaction = await _transactionRepository.GetByTransactionIdAsync(request.TxnId);
 
-                if (payment != null)
+                if (transaction != null)
                 {
                     switch (request.Status)
                     {
                         case 1: // Payment confirmed
-                            payment.Status = "CONFIRMED";
+                            transaction.Status = TransactionStatus.PENDING; // Still waiting for completion
                             break;
                         case 100: // Payment completed
-                            payment.Status = "COMPLETED";
-                            payment.CompletedAt = DateTime.UtcNow;
+                            transaction.Status = TransactionStatus.COMPLETED;
+                            transaction.UpdatedAt = DateTime.UtcNow;
                             break;
                         case -1: // Payment failed
-                            payment.Status = "FAILED";
+                            transaction.Status = TransactionStatus.FAILED;
+                            transaction.UpdatedAt = DateTime.UtcNow;
                             break;
                         case -2: // Payment cancelled
-                            payment.Status = "CANCELLED";
+                            transaction.Status = TransactionStatus.CANCELLED;
+                            transaction.UpdatedAt = DateTime.UtcNow;
                             break;
                     }
 
-                    _logger.LogInformation($"CoinPayments webhook: Transaction {request.TxnId} status updated to {payment.Status}");
+                    await _transactionRepository.UpdateAsync(transaction);
+                    _logger.LogInformation("CoinPayments webhook: Transaction {TxnId} status updated to {Status}", request.TxnId, transaction.Status);
                 }
 
-                return Task.FromResult<IActionResult>(Ok(new { status = "received" }));
+                return Ok(new { status = "received" });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing CoinPayments webhook");
-                return Task.FromResult<IActionResult>(BadRequest(new { error = ex.Message }));
+                return BadRequest(new { error = ex.Message });
             }
         }
 
@@ -386,6 +409,7 @@ namespace BitcoinPaymentService.Controllers
         public string Tag { get; set; } = string.Empty;
         public string BuyerEmail { get; set; } = string.Empty;
         public string ItemName { get; set; } = string.Empty;
+        public Guid? TelecomServiceId { get; set; }
     }
 
     public class CoinPaymentsWebhookRequest

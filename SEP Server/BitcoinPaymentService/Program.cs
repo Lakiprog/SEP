@@ -1,6 +1,9 @@
 using BitcoinPaymentService.Services;
 using BitcoinPaymentService.Interfaces;
 using BitcoinPaymentService.Models;
+using BitcoinPaymentService.Data;
+using BitcoinPaymentService.Data.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Consul;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +23,12 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+
+// Add Entity Framework with SQLite
+builder.Services.AddDbContext<BitcoinPaymentDbContext>(opt => opt.UseSqlServer(builder.Configuration.GetConnectionString("CryptoDB")));
+
+// Add Repository
+builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 
 // Configure CoinPayments settings
 builder.Services.Configure<CoinPaymentsConfig>(
