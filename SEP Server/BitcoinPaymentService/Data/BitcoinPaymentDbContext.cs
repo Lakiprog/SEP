@@ -21,10 +21,10 @@ namespace BitcoinPaymentService.Data
             {
                 entity.HasKey(e => e.Id);
 
-                // Configure GUID properties for SQL Server
+                // Configure auto-increment ID for SQL Server
                 entity.Property(e => e.Id)
-                    .HasColumnType("uniqueidentifier")
-                    .HasDefaultValueSql("NEWID()");
+                    .HasColumnType("bigint")
+                    .UseIdentityColumn();
 
                 entity.Property(e => e.TelecomServiceId)
                     .HasColumnType("uniqueidentifier");

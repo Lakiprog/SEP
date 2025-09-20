@@ -45,7 +45,7 @@ namespace BitcoinPaymentService.Data.Repositories
             }
         }
 
-        public async Task<Transaction?> GetByIdAsync(Guid id)
+        public async Task<Transaction?> GetByIdAsync(long id)
         {
             try
             {
@@ -124,7 +124,7 @@ namespace BitcoinPaymentService.Data.Repositories
             }
         }
 
-        public async Task DeleteAsync(Guid id)
+        public async Task DeleteAsync(long id)
         {
             try
             {
@@ -170,6 +170,33 @@ namespace BitcoinPaymentService.Data.Repositories
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting expired transactions");
+                throw;
+            }
+        }
+
+        public async Task<List<Transaction>> GetAllAsync(int skip = 0, int take = 100, bool newest = true)
+        {
+            try
+            {
+                var query = _context.Transactions.AsQueryable();
+
+                if (newest)
+                {
+                    query = query.OrderByDescending(t => t.CreatedAt);
+                }
+                else
+                {
+                    query = query.OrderBy(t => t.CreatedAt);
+                }
+
+                return await query
+                    .Skip(skip)
+                    .Take(take)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all transactions");
                 throw;
             }
         }

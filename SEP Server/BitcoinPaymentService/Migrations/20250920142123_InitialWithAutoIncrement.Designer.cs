@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BitcoinPaymentService.Migrations
 {
     [DbContext(typeof(BitcoinPaymentDbContext))]
-    [Migration("20250920133846_InitialSqlServerMigration")]
-    partial class InitialSqlServerMigration
+    [Migration("20250920142123_InitialWithAutoIncrement")]
+    partial class InitialWithAutoIncrement
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -27,10 +27,11 @@ namespace BitcoinPaymentService.Migrations
 
             modelBuilder.Entity("BitcoinPaymentService.Data.Entities.Transaction", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWID()");
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,8)")

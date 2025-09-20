@@ -8,7 +8,8 @@ namespace BitcoinPaymentService.Data.Entities
     public class Transaction
     {
         [Key]
-        public Guid Id { get; set; }
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public long Id { get; set; }
 
         [Column("transaction_id")]
         [Required]
@@ -52,7 +53,6 @@ namespace BitcoinPaymentService.Data.Entities
 
         public Transaction()
         {
-            Id = Guid.NewGuid();
             CreatedAt = DateTime.UtcNow;
             Status = TransactionStatus.PENDING;
         }
