@@ -36,6 +36,8 @@ namespace BitcoinPaymentService.Models
 
         [JsonProperty("ipn_url")]
         public string IpnUrl { get; set; } = string.Empty;
+
+        public Guid? TelecomServiceId { get; set; }
     }
 
     public class CreateTransactionResponse
@@ -63,6 +65,8 @@ namespace BitcoinPaymentService.Models
 
         [JsonProperty("qrcode_url")]
         public string QrcodeUrl { get; set; } = string.Empty;
+
+        public string Confirms { get; set; } = string.Empty;
     }
 
     public class GetTransactionInfoResponse
