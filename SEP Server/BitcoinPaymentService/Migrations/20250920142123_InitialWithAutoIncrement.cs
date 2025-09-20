@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace BitcoinPaymentService.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialSqlServerMigration : Migration
+    public partial class InitialWithAutoIncrement : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,7 +15,8 @@ namespace BitcoinPaymentService.Migrations
                 name: "transactions",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false, defaultValueSql: "NEWID()"),
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
                     transaction_id = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     buyer_email = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     currency1 = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),

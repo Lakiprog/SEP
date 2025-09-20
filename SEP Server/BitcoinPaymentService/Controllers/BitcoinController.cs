@@ -389,6 +389,43 @@ namespace BitcoinPaymentService.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+
+        [HttpGet("transactions")]
+        public async Task<IActionResult> GetAllTransactions([FromQuery] int skip = 0, [FromQuery] int take = 100, [FromQuery] bool newest = true)
+        {
+            try
+            {
+                var transactions = await _transactionRepository.GetAllAsync(skip, take, newest);
+
+                return Ok(new
+                {
+                    transactions = transactions.Select(t => new
+                    {
+                        transaction_id = t.TransactionId,
+                        buyer_email = t.BuyerEmail,
+                        amount = t.Amount,
+                        currency1 = t.Currency1,
+                        currency2 = t.Currency2,
+                        status = t.Status.ToString(),
+                        created_at = t.CreatedAt,
+                        updated_at = t.UpdatedAt,
+                        telecom_service_id = t.TelecomServiceId
+                    }),
+                    pagination = new
+                    {
+                        skip = skip,
+                        take = take,
+                        count = transactions.Count,
+                        newest_first = newest
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all transactions");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
     }
 
     public class CreateInvoicePaymentRequest

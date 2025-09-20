@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import QRCodeDisplay from './QRCodeDisplay';
 import CountdownTimer from './CountdownTimer';
 import { bitcoinPaymentService } from '../services/bitcoinPaymentService';
@@ -17,6 +17,7 @@ const CryptoPayment = ({
   const [error, setError] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [serviceAvailable, setServiceAvailable] = useState(null);
+  const initializedRef = useRef(false);
 
   // Check if Bitcoin payment service is available
   const checkServiceHealth = useCallback(async () => {
@@ -109,7 +110,10 @@ const CryptoPayment = ({
 
   // Start payment creation on component mount
   useEffect(() => {
-    createPayment();
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      createPayment();
+    }
   }, [createPayment]);
 
   // Set up status polling
@@ -127,6 +131,7 @@ const CryptoPayment = ({
     setPaymentData(null);
     setError(null);
     setPaymentStatus('pending');
+    initializedRef.current = false; // Reset initialization flag
     createPayment();
   };
 
