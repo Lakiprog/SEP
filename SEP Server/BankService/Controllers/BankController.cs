@@ -590,7 +590,7 @@ namespace BankService.Controllers
                 // Update transaction status
                 transaction.Status = isSuccess ? "SUCCESS" : "FAILED";
                 transaction.ProcessedAt = DateTime.UtcNow;
-                transaction.StatusMessage = isSuccess ? "QR plaćanje uspešno izvršeno" : "QR plaćanje neuspešno";
+                transaction.StatusMessage = isSuccess ? "QR payment successful" : "QR payment unsuccessful";
                 
                 await _bankTransactionRepository.UpdateAsync(transaction);
 
@@ -627,7 +627,7 @@ namespace BankService.Controllers
                 return BadRequest(new 
                 { 
                     success = false,
-                    message = "Greška prilikom obrade QR plaćanja",
+                    message = "Error during QR payment processing",
                     error = ex.Message 
                 });
             }

@@ -323,7 +323,7 @@ const PackageDealsUser = () => {
                   </>
                 ) : (
                   <>
-                    💳 Pay Now
+                    Pay Now
                   </>
                 )}
               </Button>
