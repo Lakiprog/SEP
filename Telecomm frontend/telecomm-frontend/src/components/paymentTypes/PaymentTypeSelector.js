@@ -19,21 +19,43 @@ const PaymentTypeSelector = ({ onPaymentSelected, availablePaymentTypes = [] }) 
 
   const fetchPaymentTypes = async () => {
     try {
-      // In real implementation, this would call the backend API
-      // For now, we'll use mock data
-      const mockPaymentTypes = [
-        { id: 'card', name: 'Credit Card', icon: '💳', color: 'primary', description: 'Secure payment with credit or debit card' },
-        { id: 'qr', name: 'QR Code', icon: '📱', color: 'success', description: 'Scan QR code with mobile banking app' },
-        { id: 'paypal', name: 'PayPal', icon: '🌐', color: 'info', description: 'Pay with your PayPal account' },
-        { id: 'bitcoin', name: 'Bitcoin', icon: '₿', color: 'warning', description: 'Cryptocurrency payment' }
-      ];
+      // Get payment methods from PSP for Telecom client (ID: 1)
+      const response = await axios.get('https://localhost:7005/api/psp/merchants/1/payment-methods');
       
-      setPaymentTypes(mockPaymentTypes);
+      const pspPaymentTypes = response.data.map(paymentType => ({
+        id: paymentType.type,
+        name: paymentType.name,
+        icon: getPaymentIcon(paymentType.type),
+        color: getPaymentColor(paymentType.type),
+        description: paymentType.description || `Pay with ${paymentType.name}`
+      }));
+      
+      setPaymentTypes(pspPaymentTypes);
     } catch (err) {
       console.error('Error fetching payment types:', err);
       setError('Failed to load payment types');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getPaymentIcon = (type) => {
+    switch (type.toLowerCase()) {
+      case 'card': return '💳';
+      case 'qr': return '📱';
+      case 'paypal': return '🌐';
+      case 'bitcoin': return '₿';
+      default: return '💳';
+    }
+  };
+
+  const getPaymentColor = (type) => {
+    switch (type.toLowerCase()) {
+      case 'card': return 'primary';
+      case 'qr': return 'success';
+      case 'paypal': return 'info';
+      case 'bitcoin': return 'warning';
+      default: return 'primary';
     }
   };
 

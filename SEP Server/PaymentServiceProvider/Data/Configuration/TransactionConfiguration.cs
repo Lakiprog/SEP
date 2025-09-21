@@ -17,6 +17,11 @@ namespace PaymentServiceProvider.Data.Configuration
                .HasForeignKey(x => x.WebShopClientId)
                .IsRequired()
                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(x => x.PaymentType)
+               .WithMany(x => x.Transactions)
+               .HasForeignKey(x => x.PaymentTypeId)
+               .OnDelete(DeleteBehavior.Restrict); // Restrict to prevent deletion when transactions exist
         }
     }
 }

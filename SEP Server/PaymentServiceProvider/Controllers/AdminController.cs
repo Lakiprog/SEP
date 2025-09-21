@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using PaymentServiceProvider.Data;
 using PaymentServiceProvider.Models;
 using PaymentServiceProvider.Interfaces;
@@ -459,6 +460,21 @@ namespace PaymentServiceProvider.Controllers
                 if (paymentType == null)
                     return NotFound(new { message = "Payment method not found" });
 
+                // Check if trying to disable the payment method
+                if (request.IsEnabled.HasValue && request.IsEnabled.Value == false)
+                {
+                    // Count how many payment methods are currently enabled
+                    var enabledCount = await _context.PaymentTypes.CountAsync(pt => pt.IsEnabled == true);
+                    
+                    // If this is the only enabled payment method, prevent disabling it
+                    if (enabledCount <= 1 && paymentType.IsEnabled == true)
+                    {
+                        return BadRequest(new { 
+                            error = "Cannot disable the last active payment method. At least one payment method must remain active." 
+                        });
+                    }
+                }
+
                 paymentType.Name = request.Name ?? paymentType.Name;
                 paymentType.Description = request.Description ?? paymentType.Description;
                 paymentType.IsEnabled = request.IsEnabled ?? paymentType.IsEnabled;
@@ -475,21 +491,82 @@ namespace PaymentServiceProvider.Controllers
         }
 
         /// <summary>
-        /// Delete payment method
+        /// Delete payment method (automatically removes from all webshops)
         /// </summary>
         [HttpDelete("payment-methods/{id}")]
         public async Task<IActionResult> DeletePaymentMethod(int id)
         {
             try
             {
-                var paymentType = await _context.PaymentTypes.FindAsync(id);
+                var paymentType = await _context.PaymentTypes
+                    .Include(pt => pt.WebShopClientPaymentTypes)
+                    .Include(pt => pt.Transactions)
+                    .FirstOrDefaultAsync(pt => pt.Id == id);
+                    
                 if (paymentType == null)
                     return NotFound(new { message = "Payment method not found" });
 
+                // Check if this is the only active payment method
+                if (paymentType.IsEnabled)
+                {
+                    var enabledCount = await _context.PaymentTypes.CountAsync(pt => pt.IsEnabled == true);
+                    
+                    if (enabledCount <= 1)
+                    {
+                        return BadRequest(new { 
+                            error = "Cannot delete the last active payment method. At least one payment method must remain active." 
+                        });
+                    }
+                }
+
+                // Check if there are any transactions using this payment method
+                if (paymentType.Transactions != null && paymentType.Transactions.Any())
+                {
+                    var transactionCount = paymentType.Transactions.Count;
+                    return BadRequest(new { 
+                        error = $"Cannot delete payment method '{paymentType.Name}' because it has {transactionCount} transaction(s) associated with it. Payment methods with transaction history cannot be deleted." 
+                    });
+                }
+
+                var removedClientCount = 0;
+                var affectedClients = new List<string>();
+
+                // Automatically remove this payment method from all webshops
+                if (paymentType.WebShopClientPaymentTypes != null && paymentType.WebShopClientPaymentTypes.Any())
+                {
+                    // Get client names for reporting
+                    var clientIds = paymentType.WebShopClientPaymentTypes.Select(wcpt => wcpt.ClientId).ToList();
+                    var clients = await _context.WebShopClients
+                        .Where(c => clientIds.Contains(c.Id))
+                        .Select(c => new { c.Id, c.Name, c.MerchantId })
+                        .ToListAsync();
+
+                    affectedClients = clients.Select(c => $"{c.Name} ({c.MerchantId})").ToList();
+                    removedClientCount = paymentType.WebShopClientPaymentTypes.Count;
+
+                    // Remove all client associations
+                    _context.WebShopClientPaymentTypes.RemoveRange(paymentType.WebShopClientPaymentTypes);
+                }
+
+                // Remove the payment method
                 _context.PaymentTypes.Remove(paymentType);
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Payment method deleted successfully" });
+                var responseMessage = removedClientCount > 0 
+                    ? $"Payment method '{paymentType.Name}' deleted successfully. Automatically removed from {removedClientCount} webshop(s): {string.Join(", ", affectedClients)}"
+                    : $"Payment method '{paymentType.Name}' deleted successfully.";
+
+                return Ok(new { 
+                    message = responseMessage,
+                    removedFromClients = removedClientCount,
+                    affectedClients = affectedClients
+                });
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && sqlEx.Number == 547)
+            {
+                return BadRequest(new { 
+                    error = "Cannot delete payment method because it has associated transactions. Payment methods with transaction history cannot be deleted." 
+                });
             }
             catch (Exception ex)
             {
@@ -588,6 +665,43 @@ namespace PaymentServiceProvider.Controllers
                 await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Payment method removed from merchant successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Get client associations for a payment method (for information purposes)
+        /// </summary>
+        [HttpGet("payment-methods/{id}/client-associations")]
+        public async Task<IActionResult> GetClientAssociationsForPaymentMethod(int id)
+        {
+            try
+            {
+                var paymentType = await _context.PaymentTypes.FindAsync(id);
+                if (paymentType == null)
+                    return NotFound(new { message = "Payment method not found" });
+
+                var associations = await _context.WebShopClientPaymentTypes
+                    .Include(wcpt => wcpt.WebShopClient)
+                    .Where(wcpt => wcpt.PaymentTypeId == id)
+                    .Select(wcpt => new
+                    {
+                        wcpt.Id,
+                        ClientId = wcpt.ClientId,
+                        ClientName = wcpt.WebShopClient != null ? wcpt.WebShopClient.Name : "Unknown",
+                        MerchantId = wcpt.WebShopClient != null ? wcpt.WebShopClient.MerchantId : "Unknown"
+                    })
+                    .ToListAsync();
+
+                return Ok(new { 
+                    paymentMethodId = id,
+                    paymentMethodName = paymentType.Name,
+                    associationCount = associations.Count,
+                    associations = associations
+                });
             }
             catch (Exception ex)
             {

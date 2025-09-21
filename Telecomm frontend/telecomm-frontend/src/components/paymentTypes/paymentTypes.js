@@ -15,12 +15,19 @@ const PaymentTypes = (props) => {
   const fetchPaymentTypes = async () => {
     try {
       setLoading(true);
-      const resp = await httpRequest.get(`https://localhost:${constants.PORT}/api/payment-types/GetAllPayments`, { clientId: "1" });
-      setClientPaymentTypes(resp);
+      
+      // Get payment methods from PSP for Telecom client (ID: 1)
+      const pspPaymentMethods = await httpRequest.get(`https://localhost:7005/api/psp/merchants/1/payment-methods`, {});
+      setClientPaymentTypes(pspPaymentMethods || []);
 
-      const resp2 = await httpRequest.get(`https://localhost:${constants.PORT}/api/payment-types`, {});
-      const missing = resp2?.filter((pspType) => resp?.findIndex((clientType) => clientType.id === pspType.id) === -1);
-      setMissingPaymentTypes(missing);
+      // Get all available payment methods from PSP admin
+      const allPaymentMethods = await httpRequest.get(`https://localhost:7005/api/admin/payment-methods`, {});
+      
+      // Find missing payment methods (those not assigned to Telecom)
+      const missing = allPaymentMethods?.filter((pspType) => 
+        pspType.isEnabled && !pspPaymentMethods?.find((clientType) => clientType.id === pspType.id)
+      );
+      setMissingPaymentTypes(missing || []);
     } catch (err) {
       console.log(err);
     } finally {
@@ -30,9 +37,10 @@ const PaymentTypes = (props) => {
 
   const onDelete = async (data) => {
     try {
-      await httpRequest.delete(`https://localhost:${constants.PORT}/api/payment-types`, { id: data.id });
+      // Remove payment method from Telecom client in PSP
+      await httpRequest.delete(`https://localhost:7005/api/admin/merchants/1/payment-methods/${data.id}`, {});
       setClientPaymentTypes(clientPaymentTypes.filter((type) => type.id !== data.id));
-      setMissingPaymentTypes([...missingPaymentTypes, { id: data.PaymentTypeId, Name: data.Name }]);
+      setMissingPaymentTypes([...missingPaymentTypes, { id: data.id, name: data.name }]);
     } catch (err) {
       console.log(err);
     }
@@ -40,13 +48,14 @@ const PaymentTypes = (props) => {
 
   const onAdd = async (data) => {
     try {
+      // Add payment method to Telecom client in PSP
       const postData = {
-        paymentTypeId: data.id,
-        clientId: "1",
-        name: data.name,
+        paymentTypeId: data.id
       };
-      const resp = await httpRequest.post(`https://localhost:${constants.PORT}/api/payment-types`, postData);
-      setClientPaymentTypes([...clientPaymentTypes, resp]);
+      await httpRequest.post(`https://localhost:7005/api/admin/merchants/1/payment-methods`, postData);
+      
+      // Add to local state
+      setClientPaymentTypes([...clientPaymentTypes, data]);
       setMissingPaymentTypes(missingPaymentTypes.filter((type) => type.id !== data.id));
     } catch (err) {
       console.log(err);

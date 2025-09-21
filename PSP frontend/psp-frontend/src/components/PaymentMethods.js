@@ -36,6 +36,18 @@ const PaymentMethods = () => {
     e.preventDefault();
     try {
       if (editingMethod) {
+        // Check if trying to disable the payment method
+        if (editingMethod.isEnabled && !formData.isEnabled) {
+          // Count how many payment methods are currently enabled
+          const enabledCount = paymentMethods.filter(method => method.isEnabled).length;
+          
+          // If this is the only enabled payment method, prevent disabling it
+          if (enabledCount <= 1) {
+            toast.error('Cannot disable the last active payment method. At least one payment method must remain active.');
+            return;
+          }
+        }
+        
         await adminAPI.updatePaymentMethod(editingMethod.id, formData);
         toast.success('Payment method updated successfully');
       } else {
@@ -48,7 +60,8 @@ const PaymentMethods = () => {
       loadPaymentMethods();
     } catch (error) {
       console.error('Error saving payment method:', error);
-      toast.error('Failed to save payment method');
+      const errorMessage = error.response?.data?.error || 'Failed to save payment method';
+      toast.error(errorMessage);
     }
   };
 
@@ -64,6 +77,17 @@ const PaymentMethods = () => {
   };
 
   const handleDelete = async (id) => {
+    const methodToDelete = paymentMethods.find(method => method.id === id);
+    
+    if (methodToDelete && methodToDelete.isEnabled) {
+      const enabledCount = paymentMethods.filter(method => method.isEnabled).length;
+      
+      if (enabledCount <= 1) {
+        toast.error('Cannot delete the last active payment method. At least one payment method must remain active.');
+        return;
+      }
+    }
+    
     if (window.confirm('Are you sure you want to delete this payment method?')) {
       try {
         await adminAPI.deletePaymentMethod(id);
@@ -71,7 +95,8 @@ const PaymentMethods = () => {
         loadPaymentMethods();
       } catch (error) {
         console.error('Error deleting payment method:', error);
-        toast.error('Failed to delete payment method');
+        const errorMessage = error.response?.data?.error || 'Failed to delete payment method';
+        toast.error(errorMessage);
       }
     }
   };
@@ -121,8 +146,10 @@ const PaymentMethods = () => {
                 Edit
               </button>
               <button 
-                className="btn btn-danger" 
+                className={`btn ${method.isEnabled && paymentMethods.filter(m => m.isEnabled).length <= 1 ? 'btn-disabled' : 'btn-danger'}`}
                 onClick={() => handleDelete(method.id)}
+                disabled={method.isEnabled && paymentMethods.filter(m => m.isEnabled).length <= 1}
+                title={method.isEnabled && paymentMethods.filter(m => m.isEnabled).length <= 1 ? 'Cannot delete the last active payment method' : 'Delete payment method'}
               >
                 Delete
               </button>
@@ -171,8 +198,14 @@ const PaymentMethods = () => {
                     type="checkbox"
                     checked={formData.isEnabled}
                     onChange={(e) => setFormData({ ...formData, isEnabled: e.target.checked })}
+                    disabled={editingMethod && editingMethod.isEnabled && paymentMethods.filter(method => method.isEnabled).length <= 1}
                   />
                   Enabled
+                  {editingMethod && editingMethod.isEnabled && paymentMethods.filter(method => method.isEnabled).length <= 1 && (
+                    <span className="warning-text" style={{color: '#ff6b6b', fontSize: '12px', marginLeft: '8px'}}>
+                      (Cannot disable - this is the only active payment method)
+                    </span>
+                  )}
                 </label>
               </div>
               <div className="modal-actions">
