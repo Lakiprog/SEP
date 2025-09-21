@@ -33,9 +33,9 @@ namespace Telecom.Services
         public async Task<LoginResponse> Login(string username, string password)
         {
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == username && u.Password == password);
+                .FirstOrDefaultAsync(u => u.Username == username);
 
-            if (user == null)
+            if (user == null || !user.VerifyPassword(password))
             {
                 throw new Exception("Invalid username or password");
             }
