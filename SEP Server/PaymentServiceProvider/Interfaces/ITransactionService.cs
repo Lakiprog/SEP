@@ -9,6 +9,7 @@ namespace PaymentServiceProvider.Interfaces
         Task<List<Transaction>> GetTransactionsByClientId(int clientId, int page = 1, int pageSize = 10);
         Task<Transaction> GetById(int id);
         Task<Transaction> GetByPSPTransactionId(string pspTransactionId);
+        Task<Transaction?> GetByExternalTransactionId(string externalTransactionId);
         Task<Transaction> GetByMerchantOrderId(string merchantOrderId);
         Task<Transaction> AddTransaction(Transaction transaction);
         Task<Transaction> UpdateTransaction(Transaction transaction);

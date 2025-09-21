@@ -12,6 +12,7 @@ namespace PaymentServiceProvider.Services
         Task<PaymentResponse> ProcessPaymentAsync(string pspTransactionId, string paymentType, Dictionary<string, object> paymentData);
         Task<PaymentStatusUpdate> UpdatePaymentStatusAsync(PaymentCallback callback);
         Task<Transaction> GetTransactionAsync(string pspTransactionId);
+        Task<Transaction?> GetTransactionByExternalIdAsync(string externalTransactionId);
         Task<List<Transaction>> GetClientTransactionsAsync(string merchantId, int page = 1, int pageSize = 10);
         Task<bool> ValidateMerchantAsync(string merchantId, string merchantPassword);
         Task<PaymentResponse> RefundPaymentAsync(string pspTransactionId, decimal amount);
@@ -265,6 +266,11 @@ namespace PaymentServiceProvider.Services
         public async Task<Transaction> GetTransactionAsync(string pspTransactionId)
         {
             return await _transactionService.GetByPSPTransactionId(pspTransactionId);
+        }
+
+        public async Task<Transaction?> GetTransactionByExternalIdAsync(string externalTransactionId)
+        {
+            return await _transactionService.GetByExternalTransactionId(externalTransactionId);
         }
 
         public async Task<Transaction> GetTransactionByMerchantOrderIdAsync(string merchantOrderId)

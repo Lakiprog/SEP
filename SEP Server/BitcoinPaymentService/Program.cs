@@ -34,8 +34,8 @@ builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.Configure<CoinPaymentsConfig>(
     builder.Configuration.GetSection("CoinPayments"));
 
-// Add HttpClient for CoinPayments service
-builder.Services.AddHttpClient<ICoinPaymentsService, CoinPaymentsService>();
+// Add HttpClient for Bitcoin service
+builder.Services.AddHttpClient<ICoinPaymentsService, BitcoinService>();
 
 // Add general HttpClient
 builder.Services.AddHttpClient();
@@ -50,8 +50,8 @@ builder.Services.AddSingleton<IConsulClient>(provider =>
     return new ConsulClient(consulConfig);
 });
 
-// Add CoinPayments service
-builder.Services.AddScoped<ICoinPaymentsService, CoinPaymentsService>();
+// Add Bitcoin service (implementing ICoinPaymentsService interface)
+builder.Services.AddScoped<ICoinPaymentsService, BitcoinService>();
 
 
 var app = builder.Build();

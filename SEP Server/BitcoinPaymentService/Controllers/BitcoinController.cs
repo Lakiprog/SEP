@@ -553,7 +553,7 @@ namespace BitcoinPaymentService.Controllers
 
                 var requestBody = string.Join("&", parameters.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
 
-                var request = new HttpRequestMessage(HttpMethod.Post, "https://www.coinpayments.net/api.php")
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://a-api.coinpayments.net/api")
                 {
                     Content = new StringContent(requestBody, Encoding.UTF8, "application/x-www-form-urlencoded")
                 };

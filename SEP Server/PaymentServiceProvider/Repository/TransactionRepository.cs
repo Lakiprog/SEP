@@ -27,9 +27,17 @@ namespace PaymentServiceProvider.Repository
                     .Include(t => t.PaymentType)
                     .FirstOrDefaultAsync(t => t.MerchantOrderId == guidValue);
             }
-            
+
             // If not a valid GUID, return null
             return null;
+        }
+
+        public async Task<Transaction?> GetByExternalTransactionId(string externalTransactionId)
+        {
+            return await _context.Transactions
+                .Include(t => t.WebShopClient)
+                .Include(t => t.PaymentType)
+                .FirstOrDefaultAsync(t => t.ExternalTransactionId == externalTransactionId);
         }
     }
 }

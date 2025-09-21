@@ -13,15 +13,18 @@ namespace PaymentServiceProvider.Controllers
         private readonly IPSPService _pspService;
         private readonly ILogger<BitcoinCallbackController> _logger;
         private readonly HttpClient _httpClient;
+        private readonly IConfiguration _configuration;
 
         public BitcoinCallbackController(
             IPSPService pspService,
             ILogger<BitcoinCallbackController> logger,
-            HttpClient httpClient)
+            HttpClient httpClient,
+            IConfiguration configuration)
         {
             _pspService = pspService;
             _logger = logger;
             _httpClient = httpClient;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -164,34 +167,83 @@ namespace PaymentServiceProvider.Controllers
 
         /// <summary>
         /// Handle webhook from CoinPayments API
+        /// Based on: https://a-docs.coinpayments.net/api/webhooks/clients/setup
         /// </summary>
         [HttpPost("coinpayments-webhook")]
-        public async Task<IActionResult> HandleCoinPaymentsWebhook([FromBody] CoinPaymentsWebhookRequest request)
+        public async Task<IActionResult> HandleCoinPaymentsWebhook()
         {
             try
             {
-                _logger.LogInformation("Received CoinPayments webhook: {RequestData}", JsonSerializer.Serialize(request));
+                // Read raw body for signature verification
+                Request.EnableBuffering();
+                using var reader = new StreamReader(Request.Body, System.Text.Encoding.UTF8, leaveOpen: true);
+                var rawBody = await reader.ReadToEndAsync();
+                Request.Body.Position = 0;
 
-                // Find transaction by external transaction ID
-                // This might need to be implemented in PSPService if not available
+                _logger.LogInformation("Received CoinPayments webhook: {RawBody}", rawBody);
+
+                // Verify webhook signature
+                if (!VerifyCoinPaymentsSignature(rawBody))
+                {
+                    _logger.LogWarning("Invalid CoinPayments webhook signature");
+                    return Unauthorized(new { message = "Invalid signature" });
+                }
+
+                // Parse webhook data
+                var webhookData = JsonSerializer.Deserialize<CoinPaymentsWebhookData>(rawBody);
+                if (webhookData?.Invoice == null)
+                {
+                    _logger.LogError("Invalid CoinPayments webhook data format");
+                    return BadRequest(new { message = "Invalid webhook data format" });
+                }
+
+                var invoice = webhookData.Invoice;
+                _logger.LogInformation("Processing CoinPayments webhook for invoice: {InvoiceId}, status: {Status}, event: {Event}",
+                    invoice.Id, invoice.Status, webhookData.Event);
+
+                // Map CoinPayments status to our transaction status
+                var transactionStatus = MapCoinPaymentsStatusToTransactionStatus(invoice.Status);
+
+                // Find PSP transaction by external transaction ID (invoice ID)
+                var pspTransaction = await _pspService.GetTransactionByExternalIdAsync(invoice.Id);
+                if (pspTransaction == null)
+                {
+                    _logger.LogError("PSP transaction not found for CoinPayments invoice: {InvoiceId}", invoice.Id);
+                    return NotFound(new { message = "Transaction not found" });
+                }
+
+                // Create payment callback
                 var callback = new PaymentCallback
                 {
-                    ExternalTransactionId = request.TxnId,
-                    Status = MapCoinPaymentsStatusToTransactionStatus(request.Status),
-                    StatusMessage = $"CoinPayments transaction {GetCoinPaymentsStatusText(request.Status)}",
-                    Amount = request.Amount,
-                    Currency = request.Currency,
+                    PSPTransactionId = pspTransaction.PSPTransactionId,
+                    ExternalTransactionId = invoice.Id,
+                    Status = transactionStatus,
+                    StatusMessage = GetEventDescription(webhookData.Event, invoice.Status),
+                    Amount = invoice.Amount?.Total ?? pspTransaction.Amount,
+                    Currency = invoice.Amount?.Currency ?? pspTransaction.Currency,
                     Timestamp = DateTime.UtcNow,
                     AdditionalData = new Dictionary<string, object>
                     {
-                        ["coinpaymentsStatus"] = request.Status,
-                        ["txnId"] = request.TxnId
+                        ["coinpaymentsEvent"] = webhookData.Event ?? "",
+                        ["coinpaymentsStatus"] = invoice.Status ?? "",
+                        ["invoiceId"] = invoice.Id ?? "",
+                        ["invoiceUrl"] = invoice.InvoiceUrl ?? "",
+                        ["paymentAddress"] = invoice.PaymentAddress ?? "",
+                        ["paymentCurrency"] = invoice.PaymentCurrency ?? "",
+                        ["paymentMethod"] = invoice.PaymentMethod ?? ""
                     }
                 };
 
-                // Note: You'll need to implement a way to find PSP transaction by external transaction ID
-                // For now, we'll try to extract it from the transaction reference
+                // Update transaction status in PSP
                 var statusUpdate = await _pspService.UpdatePaymentStatusAsync(callback);
+                if (statusUpdate != null)
+                {
+                    _logger.LogInformation("Updated PSP transaction {PSPTransactionId} to status {Status}",
+                        callback.PSPTransactionId, callback.Status);
+
+                    // Notify Gateway about payment status change
+                    await NotifyGatewayOfPaymentUpdate(callback);
+                }
 
                 return Ok(new { message = "Webhook processed successfully" });
             }
@@ -216,6 +268,30 @@ namespace PaymentServiceProvider.Controllers
             };
         }
 
+        private TransactionStatus MapCoinPaymentsStatusToTransactionStatus(string status)
+        {
+            return status?.ToLower() switch
+            {
+                // Final successful states
+                "paid" => TransactionStatus.Completed,
+                "completed" => TransactionStatus.Completed,
+                "confirmed" => TransactionStatus.Completed,
+
+                // Intermediate states
+                "unpaid" => TransactionStatus.Pending,
+                "pending" => TransactionStatus.Processing,
+                "waiting" => TransactionStatus.Pending,
+
+                // Failed/cancelled states
+                "expired" => TransactionStatus.Failed,
+                "timedout" => TransactionStatus.Failed,
+                "cancelled" => TransactionStatus.Cancelled,
+                "failed" => TransactionStatus.Failed,
+
+                _ => TransactionStatus.Pending
+            };
+        }
+
         private TransactionStatus MapCoinPaymentsStatusToTransactionStatus(int status)
         {
             return status switch
@@ -229,6 +305,49 @@ namespace PaymentServiceProvider.Controllers
             };
         }
 
+        private bool VerifyCoinPaymentsSignature(string rawBody)
+        {
+            try
+            {
+                // Get signature from header
+                var signature = Request.Headers["X-CoinPayments-Signature"].FirstOrDefault();
+                if (string.IsNullOrEmpty(signature))
+                {
+                    _logger.LogWarning("Missing X-CoinPayments-Signature header");
+                    return false;
+                }
+
+                // Get client secret from configuration (this should match BitcoinPaymentService config)
+                var clientSecret = _configuration["CoinPayments:ClientSecret"];
+                if (string.IsNullOrEmpty(clientSecret))
+                {
+                    _logger.LogError("CoinPayments ClientSecret not configured");
+                    return false;
+                }
+
+                // Generate expected signature
+                using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(clientSecret));
+                var computedHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(rawBody));
+                var expectedSignature = Convert.ToBase64String(computedHash);
+
+                // Compare signatures
+                var isValid = signature.Equals(expectedSignature, StringComparison.Ordinal);
+
+                if (!isValid)
+                {
+                    _logger.LogWarning("Signature mismatch. Expected: {Expected}, Received: {Received}",
+                        expectedSignature, signature);
+                }
+
+                return isValid;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error verifying CoinPayments signature");
+                return false;
+            }
+        }
+
         private string GetCoinPaymentsStatusText(int status)
         {
             return status switch
@@ -239,6 +358,22 @@ namespace PaymentServiceProvider.Controllers
                 -1 => "failed",
                 -2 => "cancelled",
                 _ => "unknown"
+            };
+        }
+
+        private string GetEventDescription(string? eventType, string? invoiceStatus)
+        {
+            return eventType?.ToLower() switch
+            {
+                "invoicecreated" => "Invoice created and waiting for payment",
+                "invoicepending" => "Payment detected, waiting for confirmations",
+                "invoicepaid" => "Payment confirmed and funds received",
+                "invoicecompleted" => "Payment completed and reflected in merchant balance",
+                "invoicecancelled" => "Invoice cancelled by merchant",
+                "invoicetimedout" => "Invoice expired without payment",
+                "paymentcreated" => "Payment address created for invoice",
+                "paymenttimedout" => "Payment address expired",
+                _ => $"CoinPayments event: {eventType} with status: {invoiceStatus}"
             };
         }
 
@@ -321,6 +456,35 @@ namespace PaymentServiceProvider.Controllers
 
     /// <summary>
     /// Request model for CoinPayments webhooks
+    /// Based on: https://a-docs.coinpayments.net/api/webhooks/clients/setup
+    /// </summary>
+    public class CoinPaymentsWebhookData
+    {
+        public string? Event { get; set; }
+        public CoinPaymentsInvoice? Invoice { get; set; }
+    }
+
+    public class CoinPaymentsInvoice
+    {
+        public string? Id { get; set; }
+        public string? Status { get; set; }
+        public CoinPaymentsAmount? Amount { get; set; }
+        public string? InvoiceUrl { get; set; }
+        public string? PaymentAddress { get; set; }
+        public string? PaymentCurrency { get; set; }
+        public string? PaymentMethod { get; set; }
+        public DateTime? CreatedAt { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+    }
+
+    public class CoinPaymentsAmount
+    {
+        public decimal Total { get; set; }
+        public string? Currency { get; set; }
+    }
+
+    /// <summary>
+    /// Legacy request model for CoinPayments webhooks (for backward compatibility)
     /// </summary>
     public class CoinPaymentsWebhookRequest
     {
@@ -329,4 +493,5 @@ namespace PaymentServiceProvider.Controllers
         public decimal Amount { get; set; }
         public string Currency { get; set; } = string.Empty;
     }
+
 }
