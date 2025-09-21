@@ -163,7 +163,7 @@ namespace Telecom.Migrations
                     b.Property<DateTime>("StartDate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 9, 11, 19, 8, 17, 452, DateTimeKind.Local).AddTicks(8514));
+                        .HasDefaultValue(new DateTime(2025, 9, 20, 16, 47, 16, 369, DateTimeKind.Local).AddTicks(3065));
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -184,6 +184,8 @@ namespace Telecom.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PackageId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Subscriptions");
                 });
@@ -206,6 +208,10 @@ namespace Telecom.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("UserType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -232,7 +238,15 @@ namespace Telecom.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Telecom.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Package");
+
+                    b.Navigation("User");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,6 +1,50 @@
-@BitcoinPaymentService_HostAddress = http://localhost:5259
+@BitcoinPaymentService_HostAddress = https://localhost:7002
 
+### Test Bitcoin Payment Service Health
+GET {{BitcoinPaymentService_HostAddress}}/health
+
+### Create Invoice (NEW APPROACH)
+POST {{BitcoinPaymentService_HostAddress}}/api/bitcoin/create-invoice
+Content-Type: application/json
+
+{
+  "amount": 25.00,
+  "orderId": "PSP_20250918213952_D4EA99C1",
+  "returnUrl": "http://localhost:3003/success",
+  "buyerEmail": "colakdarie@gmail.com",
+  "itemName": "Telecom Premium Package"
+}
+
+### Create QR Code Payment (OLD APPROACH)
+POST {{BitcoinPaymentService_HostAddress}}/api/bitcoin/create-qr-payment
+Content-Type: application/json
+
+{
+  "amount": 50.00,
+  "orderId": "ORDER_123",
+  "returnUrl": "https://example.com/return",
+  "currency": "BTC",
+  "buyerEmail": "user@example.com",
+  "itemName": "Test Purchase"
+}
+
+### Get Payment Status (replace {{paymentId}} with actual payment ID)
+GET {{BitcoinPaymentService_HostAddress}}/api/bitcoin/payment-status/{{paymentId}}
+
+### Get Transaction Info (replace {{transactionId}} with actual transaction ID)
+GET {{BitcoinPaymentService_HostAddress}}/api/bitcoin/transaction-info/{{transactionId}}
+
+### CoinPayments Webhook (for testing - replace {{transactionId}} with actual transaction ID)
+POST {{BitcoinPaymentService_HostAddress}}/api/bitcoin/coinpayments-webhook
+Content-Type: application/json
+
+{
+  "txnId": "{{transactionId}}",
+  "status": 100,
+  "amount": 0.0012,
+  "currency": "BTC"
+}
+
+### Weather forecast endpoint (original test endpoint)
 GET {{BitcoinPaymentService_HostAddress}}/weatherforecast/
 Accept: application/json
-
-###

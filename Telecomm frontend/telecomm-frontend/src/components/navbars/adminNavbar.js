@@ -7,6 +7,7 @@ const AdminNavbar = (props) => {
       <Nav>
         <NavLink href="/paymentTypes">Payment types</NavLink>
         <NavLink href="/packageDealsAdmin">Package Deals</NavLink>
+        <NavLink href="/packageDealsUser">My Subscriptions</NavLink>
         <NavLink href="/login">Logout</NavLink>
       </Nav>
     </Navbar>

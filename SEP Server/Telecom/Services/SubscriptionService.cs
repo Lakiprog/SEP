@@ -43,6 +43,7 @@ namespace Telecom.Services
             {
                 return await _context.Subscriptions
                     .Include(s => s.Package)
+                    .Include(s => s.User)
                     .Where(s => s.UserId == userId)
                     .OrderByDescending(s => s.CreatedAt)
                     .ToListAsync();
@@ -50,6 +51,23 @@ namespace Telecom.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error getting subscriptions for user {userId}");
+                throw;
+            }
+        }
+
+        public async Task<List<Subscription>> GetAllSubscriptions()
+        {
+            try
+            {
+                return await _context.Subscriptions
+                    .Include(s => s.Package)
+                    .Include(s => s.User)
+                    .OrderByDescending(s => s.CreatedAt)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting all subscriptions");
                 throw;
             }
         }
@@ -95,6 +113,7 @@ namespace Telecom.Services
                 {
                     return await _context.Subscriptions
                         .Include(s => s.Package)
+                        .Include(s => s.User)
                         .FirstOrDefaultAsync(s => s.TransactionId == transactionGuid);
                 }
                 return null;
@@ -112,6 +131,7 @@ namespace Telecom.Services
             {
                 return await _context.Subscriptions
                     .Include(s => s.Package)
+                    .Include(s => s.User)
                     .FirstOrDefaultAsync(s => s.Id == id);
             }
             catch (Exception ex)

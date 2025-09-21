@@ -130,6 +130,24 @@ namespace Telecom.Controllers
         /// <summary>
         /// Get all subscriptions for a user
         /// </summary>
+        [HttpGet("all-subscriptions")]
+        public async Task<IActionResult> GetUserSubscriptions()
+        {
+            try
+            {
+                var subscriptions = await _subscriptionService.GetAllSubscriptions();
+                return Ok(subscriptions);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting all subscriptions");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Get all subscriptions for a user
+        /// </summary>
         [HttpGet("user/{userId}")]
         public async Task<IActionResult> GetUserSubscriptions(int userId)
         {
