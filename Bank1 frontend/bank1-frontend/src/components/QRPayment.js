@@ -185,7 +185,7 @@ const QRPayment = () => {
 
         {qrCodeImage && (
           <div className="qr-code-section">
-            <h3>Generisani QR kod</h3>
+            <h3>Generate QR code</h3>
             {console.log('🖼️ Rendering QR code section, image exists:', !!qrCodeImage)}
             <div className="qr-code-container">
               <img 

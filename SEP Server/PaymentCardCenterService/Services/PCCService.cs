@@ -188,21 +188,35 @@ namespace PaymentCardCenterService.Services
                 var json = JsonSerializer.Serialize(issuerRequest);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+                Console.WriteLine($"[PCC DEBUG] Forwarding to issuer bank URL: {issuerBankUrl}/api/bank/issuer/process");
+                Console.WriteLine($"[PCC DEBUG] Request payload: {json}");
+
                 // Forward to issuer bank
                 var response = await _httpClient.PostAsync($"{issuerBankUrl}/api/bank/issuer/process", content);
-                
+
+                Console.WriteLine($"[PCC DEBUG] Issuer bank response status: {response.StatusCode}");
+
                 if (!response.IsSuccessStatusCode)
                 {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[PCC ERROR] Issuer bank error response: {errorContent}");
                     return new IssuerBankResponse
                     {
                         Success = false,
                         Status = TransactionStatus.Failed,
-                        StatusMessage = "Issuer bank service unavailable"
+                        StatusMessage = $"Issuer bank service unavailable: {response.StatusCode}"
                     };
                 }
 
                 var responseContent = await response.Content.ReadAsStringAsync();
-                var issuerResponse = JsonSerializer.Deserialize<IssuerBankResponse>(responseContent);
+                Console.WriteLine($"[PCC DEBUG] Issuer bank response content: {responseContent}");
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+                var issuerResponse = JsonSerializer.Deserialize<IssuerBankResponse>(responseContent, options);
 
                 return issuerResponse ?? new IssuerBankResponse
                 {
@@ -213,6 +227,8 @@ namespace PaymentCardCenterService.Services
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[PCC ERROR] Exception forwarding to issuer bank: {ex.Message}");
+                Console.WriteLine($"[PCC ERROR] Stack trace: {ex.StackTrace}");
                 return new IssuerBankResponse
                 {
                     Success = false,

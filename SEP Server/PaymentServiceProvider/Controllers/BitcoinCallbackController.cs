@@ -382,15 +382,16 @@ namespace PaymentServiceProvider.Controllers
             try
             {
                 var gatewayUrl = "https://localhost:5001"; // Gateway URL
-                var callbackData = new
+                var callbackData = new PaymentCallback
                 {
                     PSPTransactionId = callback.PSPTransactionId,
                     ExternalTransactionId = callback.ExternalTransactionId,
-                    Status = (int)callback.Status, // Convert enum to int
+                    Status = callback.Status, // Keep as enum
                     StatusMessage = callback.StatusMessage,
                     Amount = callback.Amount,
                     Currency = callback.Currency,
-                    Timestamp = callback.Timestamp
+                    Timestamp = callback.Timestamp,
+                    AdditionalData = callback.AdditionalData
                 };
 
                 var json = JsonSerializer.Serialize(callbackData);

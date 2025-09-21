@@ -7,7 +7,12 @@ using Consul;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<BankServiceDbContext>(opt => opt.UseSqlServer(builder.Configuration.GetConnectionString("BankOneDB")));
+// Get bank name from environment variable
+var bankName = Environment.GetEnvironmentVariable("BankName") ?? "BankOne";
+var connectionStringName = bankName == "BankOne" ? "BankOneDB" : "BankTwoDB";
+
+builder.Services.AddDbContext<BankServiceDbContext>(opt =>
+    opt.UseSqlServer(builder.Configuration.GetConnectionString(connectionStringName)));
 
 // Add services to the container.
 
@@ -80,16 +85,21 @@ lifetime.ApplicationStarted.Register(async () =>
 {
     try
     {
+        // Dynamic registration based on bank instance
+        var serviceId = bankName == "BankOne" ? "bank-service-1" : "bank-service-2";
+        var httpsPort = bankName == "BankOne" ? 7001 : 7101;
+        var httpPort = bankName == "BankOne" ? 7000 : 7100;
+
         var registration = new AgentServiceRegistration
         {
-            ID = "bank-service-1",
+            ID = serviceId,
             Name = "bank-service",
             Address = "localhost",
-            Port = 7001,
-            Tags = new[] { "payment", "bank", "internal" },
+            Port = httpsPort,
+            Tags = new[] { "payment", "bank", "internal", bankName.ToLower() },
             Check = new AgentServiceCheck
             {
-                HTTP = "http://localhost:7000/health",
+                HTTP = $"http://localhost:{httpPort}/health",
                 Interval = TimeSpan.FromSeconds(10),
                 Timeout = TimeSpan.FromSeconds(5),
                 DeregisterCriticalServiceAfter = TimeSpan.FromMinutes(5)
@@ -97,15 +107,16 @@ lifetime.ApplicationStarted.Register(async () =>
         };
 
         await consulClient.Agent.ServiceRegister(registration);
-        Console.WriteLine("Bank Service registered with Consul");
+        Console.WriteLine($"{bankName} Service registered with Consul");
         Console.WriteLine($"Service ID: {registration.ID}");
         Console.WriteLine($"Service Name: {registration.Name}");
+        Console.WriteLine($"Database: {connectionStringName}");
         Console.WriteLine($"Health Check URL: {registration.Check.HTTP}");
     }
     catch (Exception ex)
     {
         Console.WriteLine($"Failed to register with Consul: {ex.Message}");
-        Console.WriteLine("Bank Service running without service discovery");
+        Console.WriteLine($"{bankName} Service running without service discovery");
     }
 });
 
@@ -113,8 +124,9 @@ lifetime.ApplicationStopping.Register(async () =>
 {
     try
     {
-        await consulClient.Agent.ServiceDeregister("bank-service-1");
-        Console.WriteLine("Bank Service deregistered from Consul");
+        var serviceId = bankName == "BankOne" ? "bank-service-1" : "bank-service-2";
+        await consulClient.Agent.ServiceDeregister(serviceId);
+        Console.WriteLine($"{bankName} Service deregistered from Consul");
     }
     catch (Exception ex)
     {

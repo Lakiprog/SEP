@@ -111,8 +111,8 @@ namespace PaymentCardCenterService.Data
                     Id = 2,
                     BinCode = "5555",
                     CardType = "MasterCard",
-                    Description = "Bank1 MasterCard kartice",
-                    BankId = 1,
+                    Description = "Bank2 MasterCard kartice",
+                    BankId = 2,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
                 },
