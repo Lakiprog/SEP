@@ -16,9 +16,7 @@ function App() {
           <Route path="/" element={
             <div className="home-page">
               <h1>🏦 Bank1 Service</h1>
-              <p>Dobrodošli u Bank1 plaćanja sistem</p>
-              <p>Za QR plaćanje idite na /qr-payment</p>
-              <p>Za plaćanje karticom idite na /card-payment</p>
+              <p>Bank1 Payment System</p>
             </div>
           } />
         </Routes>

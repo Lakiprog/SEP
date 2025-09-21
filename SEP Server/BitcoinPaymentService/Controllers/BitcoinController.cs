@@ -741,7 +741,7 @@ namespace BitcoinPaymentService.Controllers
 
             if (transaction != null && transaction.Status == TransactionStatus.COMPLETED)
             {
-                _logger.LogInformation("Transakcija je već završena za ID: {TransactionId}", transaction.TransactionId);
+                _logger.LogInformation("Transaction already completed for ID: {TransactionId}", transaction.TransactionId);
                 return;
             }
 
@@ -751,7 +751,7 @@ namespace BitcoinPaymentService.Controllers
                 transaction.UpdatedAt = DateTime.UtcNow;
 
                 await _transactionRepository.UpdateAsync(transaction);
-                _logger.LogInformation("Transakcija je ažurirana u bazi sa statusom 'COMPLETED'");
+                _logger.LogInformation("Transaction updated in database with status 'COMPLETED'");
                 await NotifyWebShopAsync(transaction.BuyerEmail, transaction.TelecomServiceId, true, "");
             }
         }
@@ -793,7 +793,7 @@ namespace BitcoinPaymentService.Controllers
 
         public async Task HandleExpiredTransactionAsync(BitcoinPaymentService.Data.Entities.Transaction transactionForUpdate)
         {
-            _logger.LogInformation("Transakcija je istekla ili otkazana! Ažuriram bazu za txnId: {TransactionId}", transactionForUpdate.TransactionId);
+            _logger.LogInformation("Transaction has expired or been cancelled! Updating database for txnId: {TransactionId}", transactionForUpdate.TransactionId);
             var transaction = await _transactionRepository.GetByTransactionIdAsync(transactionForUpdate.TransactionId);
 
             if (transaction != null)

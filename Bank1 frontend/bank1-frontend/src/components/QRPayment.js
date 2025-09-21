@@ -71,14 +71,14 @@ const QRPayment = () => {
           receiverName: response.data.receiverName,
           orderId: response.data.orderId
         });
-        toast.success('QR kod je uspešno generisan!');
+        toast.success('QR code generated successfully!');
       } else {
         console.log('❌ QR generation failed:', response.data);
-        toast.error('Greška prilikom generisanja QR koda');
+        toast.error('Error generating QR code');
       }
     } catch (error) {
       console.error('Error generating QR code:', error);
-      toast.error('Greška u komunikaciji sa bankom');
+      toast.error('Error communicating with bank');
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ const QRPayment = () => {
 
   const handleVerifyAndPay = async () => {
     if (!paymentData || !paymentId) {
-      toast.error('Podaci o plaćanju nisu dostupni');
+      toast.error('Payment data not available');
       return;
     }
 
@@ -118,7 +118,7 @@ const QRPayment = () => {
       });
 
       if (transactionResponse.data.success) {
-        toast.success('Plaćanje je uspešno izvršeno!');
+        toast.success('Payment completed successfully!');
         
         // Wait a bit for user to see the success message
         setTimeout(() => {
@@ -131,11 +131,11 @@ const QRPayment = () => {
           }
         }, 2000);
       } else {
-        toast.error(`Plaćanje neuspešno: ${transactionResponse.data.message || 'Nepoznata greška'}`);
+        toast.error(`Payment failed: ${transactionResponse.data.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error processing payment:', error);
-      const errorMessage = error.response?.data?.message || 'Greška prilikom obrade plaćanja';
+      const errorMessage = error.response?.data?.message || 'Error processing payment';
       toast.error(errorMessage);
     } finally {
       setVerifying(false);
@@ -157,27 +157,27 @@ const QRPayment = () => {
     <div className="qr-payment-container">
       <div className="qr-payment-card">
         <div className="bank-header">
-          <h1>🏦 Bank1 - QR Plaćanje</h1>
-          <p>Sigurno plaćanje preko QR koda</p>
+          <h1>QR Payment</h1>
+          <p>Secure payment via QR code</p>
         </div>
 
         <div className="payment-info">
-          <h3>Detalji plaćanja</h3>
+          <h3>Payment details</h3>
           <div className="payment-details">
             <div className="detail-row">
-              <span>Iznos:</span>
+              <span>Amount:</span>
               <span className="amount">{amount} RSD</span>
             </div>
             <div className="detail-row">
-              <span>Primalac:</span>
+              <span>Receiver:</span>
               <span>{paymentData?.receiverName || 'Telekom Srbija'}</span>
             </div>
             <div className="detail-row">
-              <span>Račun:</span>
+              <span>Account:</span>
               <span>{paymentData?.accountNumber || '105000000000099939'}</span>
             </div>
             <div className="detail-row">
-              <span>Nalog ID:</span>
+              <span>Order ID:</span>
               <span>{orderId}</span>
             </div>
           </div>
@@ -194,17 +194,10 @@ const QRPayment = () => {
                 className="qr-code-image"
               />
             </div>
-            <p className="qr-instruction">
-              Ovaj QR kod sadrži sve podatke o plaćanju prema NBS IPS standardu
-            </p>
+
           </div>
         )}
-
-        <div className="payment-instruction">
-          <h3>💳 Automatsko procesiranje plaćanja</h3>
-          <p>Prikazani QR kod sadrži sve potrebne informacije za plaćanje.</p>
-          <p>Kliknite na dugme ispod da procesite plaćanje automatski koristeći ovaj QR kod.</p>
-        </div>
+          <p>Click the button below to process the payment automatically using this QR code.</p>
 
         <div className="action-buttons">
           <button
@@ -212,19 +205,19 @@ const QRPayment = () => {
             onClick={handleCancel}
             disabled={verifying}
           >
-            ❌ Otkaži
+            ❌ Cancel
           </button>
           <button
             className="btn btn-primary"
             onClick={handleVerifyAndPay}
             disabled={!qrCodeImage || verifying}
           >
-            {verifying ? '🔄 Procesujem plaćanje...' : '✅ Izvrši plaćanje'}
+            {verifying ? '🔄 Processing payment...' : '✅ Process payment'}
           </button>
         </div>
 
         <div className="security-notice">
-          <p>🔒 Vaši podaci su bezbedni i šifrovani</p>
+          <p>🔒 Your data is secure and encrypted</p>
         </div>
       </div>
     </div>

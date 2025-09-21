@@ -33,26 +33,26 @@ namespace BankService.Services
             // Format QR code data according to NBS IPS specification
             // NBS IPS QR kod format prema specifikaciji sa tagovima
             
-            // Obavezni tagovi
+            // Required tags
             var qrString = "K:PR|V:01|C:1|";
             
-            // Formatiranje broja računa kao 18-cifreni string bez crtica
+            // Format account number as 18-digit string without dashes
             var formattedAccountNumber = FormatAccountNumber(accountNumber);
             qrString += $"R:{formattedAccountNumber}|";
             
-            // Naziv primaoca plaćanja
+            // Payment receiver name
             var formattedReceiverName = FormatReceiverName(receiverName);
             qrString += $"N:{formattedReceiverName}|";
             
-            // Opcioni tagovi
+            // Optional tags
             if (amount > 0 && !string.IsNullOrEmpty(currency))
             {
-                // Format I:RSD1025,1 ili I:RSD1025,12 - sa zarezom prema specifikaciji
+                // Format I:RSD1025,1 or I:RSD1025,12 - with comma according to specification
                 var amountStr = amount.ToString("F2").Replace(".", ",");
                 qrString += $"I:{currency}{amountStr}|";
             }
             
-            // SF tag je uvek 221 prema specifikaciji
+            // SF tag is always 221 according to specification
             qrString += "SF:221|";
             
             if (!string.IsNullOrEmpty(purpose))
@@ -61,7 +61,7 @@ namespace BankService.Services
             }
             else
             {
-                // Default svrha plaćanja ako nije specificirana
+                // Default payment purpose if not specified
                 qrString += "S:Telekom usluge|";
             }
             
@@ -84,13 +84,13 @@ namespace BankService.Services
             // Uklanjanje svih crtica i razmaka
             var cleanNumber = accountNumber.Replace("-", "").Replace(" ", "");
             
-            // Proverava da li sadrži samo brojeve
+            // Check if it contains only numbers
             if (!cleanNumber.All(char.IsDigit))
             {
-                throw new ArgumentException("Broj računa mora sadržavati samo brojeve");
+                throw new ArgumentException("Account number must contain only numbers");
             }
             
-            // Formatiranje kao 18-cifreni string sa vodećim nulama
+            // Format as 18-digit string with leading zeros
             return cleanNumber.PadLeft(18, '0');
         }
 
@@ -101,10 +101,10 @@ namespace BankService.Services
                 throw new ArgumentException("Naziv primaoca je obavezan");
             }
             
-            // Uklanjanje vodećih i završnih razmaka
+            // Remove leading and trailing spaces
             var trimmedName = receiverName.Trim();
             
-            // Zamena višestrukih razmaka sa jednim razmakom
+            // Replace multiple spaces with single space
             while (trimmedName.Contains("  "))
             {
                 trimmedName = trimmedName.Replace("  ", " ");
@@ -131,10 +131,10 @@ namespace BankService.Services
             
             if (string.IsNullOrEmpty(cleanNumber))
             {
-                throw new ArgumentException("Broj odobrenja mora sadržavati bar jednu cifru");
+                throw new ArgumentException("Approval number must contain at least one digit");
             }
             
-            // Maksimalno 23 cifre za cleanNumber jer dodajemo "00" na početak
+            // Maximum 23 digits for cleanNumber because we add "00" at the beginning
             // Ukupno maksimalno 25 cifara (00 + maksimalno 23 cifre)
             if (cleanNumber.Length > 23)
             {
@@ -156,7 +156,7 @@ namespace BankService.Services
                     return false;
                 }
 
-                // Proverava da li počinje sa K:PR (NBS IPS QR kod identifikator)
+                // Check if it starts with K:PR (NBS IPS QR code identifier)
                 if (!qrCodeData.StartsWith("K:PR"))
                 {
                     return false;
@@ -193,7 +193,7 @@ namespace BankService.Services
                             hasC = true;
                             break;
                         case "R":
-                            // Broj računa mora biti 18-cifreni numerički string
+                            // Account number must be 18-digit numeric string
                             if (string.IsNullOrEmpty(tagValue) || tagValue.Length != 18 || !tagValue.All(char.IsDigit))
                                 return false;
                             hasR = true;
@@ -205,13 +205,13 @@ namespace BankService.Services
                             hasN = true;
                             break;
                         case "I":
-                            // Format I:RSD1025,1 ili I:RSD1025,12 - sa zarezom prema specifikaciji
+                            // Format I:RSD1025,1 or I:RSD1025,12 - with comma according to specification
                             if (string.IsNullOrEmpty(tagValue) || tagValue.Length < 4)
                                 return false;
-                            // Proverava da li počinje sa valutom (3 karaktera)
+                            // Check if it starts with currency (3 characters)
                             if (!char.IsLetter(tagValue[0]) || !char.IsLetter(tagValue[1]) || !char.IsLetter(tagValue[2]))
                                 return false;
-                            // Proverava da li sadrži cifre i zarez
+                            // Check if it contains digits and comma
                             var amountPart = tagValue.Substring(3);
                             if (!amountPart.Contains(",") || amountPart.Count(c => c == ',') != 1)
                                 return false;
@@ -222,7 +222,7 @@ namespace BankService.Services
                                 return false;
                             break;
                         case "RO":
-                            // RO tag mora počinjati sa 00 i sadržavati samo cifre, maksimalno 25 karaktera
+                            // RO tag must start with 00 and contain only digits, maximum 25 characters
                             if (string.IsNullOrEmpty(tagValue) || tagValue.Length < 2 || tagValue.Length > 25)
                                 return false;
                             if (!tagValue.StartsWith("00") || !tagValue.All(char.IsDigit))
@@ -252,10 +252,10 @@ namespace BankService.Services
                     return (false, errors);
                 }
 
-                // Proverava da li počinje sa K:PR
+                // Check if it starts with K:PR
                 if (!qrCodeData.StartsWith("K:PR"))
                 {
-                    errors.Add("QR kod mora počinjati sa 'K:PR'");
+                    errors.Add("QR code must start with 'K:PR'");
                 }
 
                 // Razdvajanje tagova po delimiteru |
@@ -313,15 +313,15 @@ namespace BankService.Services
                         case "R":
                             if (string.IsNullOrEmpty(tagValue))
                             {
-                                errors.Add("Broj računa je obavezan");
+                                errors.Add("Account number is required");
                             }
                             else if (tagValue.Length != 18)
                             {
-                                errors.Add("Broj računa mora imati tačno 18 cifara");
+                                errors.Add("Account number must have exactly 18 digits");
                             }
                             else if (!tagValue.All(char.IsDigit))
                             {
-                                errors.Add("Broj računa mora sadržavati samo brojeve");
+                                errors.Add("Account number must contain only numbers");
                             }
                             else
                             {
@@ -335,7 +335,7 @@ namespace BankService.Services
                             }
                             else if (tagValue.Length > 25)
                             {
-                                errors.Add("Naziv primaoca ne sme biti duži od 25 karaktera");
+                                errors.Add("Receiver name cannot be longer than 25 characters");
                             }
                             else
                             {
@@ -353,14 +353,14 @@ namespace BankService.Services
                             }
                             else if (!char.IsLetter(tagValue[0]) || !char.IsLetter(tagValue[1]) || !char.IsLetter(tagValue[2]))
                             {
-                                errors.Add("Iznos mora počinjati sa valutom (3 slova)");
+                                errors.Add("Amount must start with currency (3 letters)");
                             }
                             else
                             {
                                 var amountPart = tagValue.Substring(3);
                                 if (!amountPart.Contains(",") || amountPart.Count(c => c == ',') != 1)
                                 {
-                                    errors.Add("Iznos mora sadržavati tačno jedan zarez (npr. RSD1025,1)");
+                                    errors.Add("Amount must contain exactly one comma (e.g. RSD1025,1)");
                                 }
                             }
                             break;
@@ -373,7 +373,7 @@ namespace BankService.Services
                         case "S":
                             if (string.IsNullOrEmpty(tagValue))
                             {
-                                errors.Add("Svrha plaćanja ne sme biti prazna");
+                                errors.Add("Payment purpose cannot be empty");
                             }
                             break;
                         case "RO":
@@ -383,15 +383,15 @@ namespace BankService.Services
                             }
                             else if (tagValue.Length < 2 || tagValue.Length > 25)
                             {
-                                errors.Add("Referenca mora imati između 2 i 25 karaktera");
+                                errors.Add("Reference must have between 2 and 25 characters");
                             }
                             else if (!tagValue.StartsWith("00"))
                             {
-                                errors.Add("Referenca mora počinjati sa '00'");
+                                errors.Add("Reference must start with '00'");
                             }
                             else if (!tagValue.All(char.IsDigit))
                             {
-                                errors.Add("Referenca mora sadržavati samo cifre");
+                                errors.Add("Reference must contain only digits");
                             }
                             break;
                         default:
@@ -411,7 +411,7 @@ namespace BankService.Services
             }
             catch (Exception ex)
             {
-                errors.Add($"Greška prilikom validacije: {ex.Message}");
+                errors.Add($"Validation error: {ex.Message}");
                 return (false, errors);
             }
         }
@@ -443,7 +443,7 @@ namespace BankService.Services
             }
             catch
             {
-                // Vraća prazan dictionary u slučaju greške
+                // Return empty dictionary in case of error
             }
             
             return result;
@@ -455,7 +455,7 @@ namespace BankService.Services
             return GeneratePaymentQRCode(
                 amount: 49.99m,
                 currency: "RSD",
-                accountNumber: "105-0000000000999-39", // Biti će formatiran kao 18-cifreni string
+                accountNumber: "105-0000000000999-39", // Will be formatted as 18-digit string
                 receiverName: "Telekom Srbija",
                 orderId: "69007399344596557495215",
                 purpose: "Telekom paket Premium"
