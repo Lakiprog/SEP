@@ -388,105 +388,15 @@ namespace BitcoinPaymentService.Controllers
 
                 _logger.LogInformation("CoinPayments IPN Raw Content: {Content}", rawContent);
 
-                // Parse form data
-                var formData = new Dictionary<string, string>();
-                if (!string.IsNullOrEmpty(rawContent))
+                // Try to parse as JSON first (new webhook format)
+                if (rawContent.StartsWith("{"))
                 {
-                    var pairs = rawContent.Split('&');
-                    foreach (var pair in pairs)
-                    {
-                        var keyValue = pair.Split('=');
-                        if (keyValue.Length == 2)
-                        {
-                            var key = Uri.UnescapeDataString(keyValue[0]);
-                            var value = Uri.UnescapeDataString(keyValue[1]);
-                            formData[key] = value;
-                        }
-                    }
+                    return await ProcessJsonWebhook(rawContent);
                 }
-
-                _logger.LogInformation("Parsed IPN data: {Data}", string.Join(", ", formData.Select(kv => $"{kv.Key}={kv.Value}")));
-
-                // Extract key fields
-                var txnId = formData.GetValueOrDefault("txn_id", "");
-                var status = formData.GetValueOrDefault("status", "");
-                var statusText = formData.GetValueOrDefault("status_text", "");
-                var amount1 = formData.GetValueOrDefault("amount1", "");
-                var amount2 = formData.GetValueOrDefault("amount2", "");
-                var currency1 = formData.GetValueOrDefault("currency1", "");
-                var currency2 = formData.GetValueOrDefault("currency2", "");
-                var buyerEmail = formData.GetValueOrDefault("email", "");
-
-                _logger.LogInformation("CoinPayments IPN: TxnId={TxnId}, Status={Status}, StatusText={StatusText}, Amount1={Amount1}, Currency1={Currency1}",
-                    txnId, status, statusText, amount1, currency1);
-
-                if (!string.IsNullOrEmpty(txnId))
+                else
                 {
-                    // Find transaction by transaction ID
-                    var transaction = await _transactionRepository.GetByTransactionIdAsync(txnId);
-
-                    if (transaction != null)
-                    {
-                        // Parse status as integer
-                        if (int.TryParse(status, out int statusCode))
-                        {
-                            var oldStatus = transaction.Status;
-
-                            switch (statusCode)
-                            {
-                                case 0: // Waiting for buyer funds
-                                    transaction.Status = TransactionStatus.PENDING;
-                                    break;
-                                case 1: // We have confirmed coin reception from the buyer
-                                    transaction.Status = TransactionStatus.PENDING;
-                                    break;
-                                case 2: // Queued for nightly payout (if auto_confirm was disabled)
-                                    transaction.Status = TransactionStatus.PENDING;
-                                    break;
-                                case 100: // Payment complete
-                                    transaction.Status = TransactionStatus.COMPLETED;
-                                    transaction.UpdatedAt = DateTime.UtcNow;
-
-                                    // Notify PSP about completed payment
-                                    await NotifyPSPAsync(transaction, true, "Payment completed successfully");
-                                    break;
-                                case -1: // Cancelled / Timed Out
-                                    transaction.Status = TransactionStatus.CANCELLED;
-                                    transaction.UpdatedAt = DateTime.UtcNow;
-
-                                    // Notify PSP about failed payment
-                                    await NotifyPSPAsync(transaction, false, "Payment cancelled or timed out");
-                                    break;
-                                case -2: // Refunded
-                                    transaction.Status = TransactionStatus.CANCELLED;
-                                    transaction.UpdatedAt = DateTime.UtcNow;
-
-                                    // Notify PSP about refunded payment
-                                    await NotifyPSPAsync(transaction, false, "Payment refunded");
-                                    break;
-                                default:
-                                    _logger.LogWarning("Unknown CoinPayments status code: {StatusCode}", statusCode);
-                                    break;
-                            }
-
-                            await _transactionRepository.UpdateAsync(transaction);
-
-                            _logger.LogInformation("CoinPayments IPN: Updated transaction {TxnId} status from {OldStatus} to {NewStatus}",
-                                txnId, oldStatus, transaction.Status);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Could not parse status code: {Status}", status);
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Transaction not found for TxnId: {TxnId}", txnId);
-                    }
+                    return await ProcessFormWebhook(rawContent);
                 }
-
-                // Return 200 OK to acknowledge receipt
-                return Ok("IPN received");
             }
             catch (Exception ex)
             {
@@ -496,39 +406,269 @@ namespace BitcoinPaymentService.Controllers
             }
         }
 
-        private async Task NotifyPSPAsync(BitcoinPaymentService.Data.Entities.Transaction transaction, bool success, string message)
+        private async Task<IActionResult> ProcessJsonWebhook(string jsonContent)
         {
             try
             {
-                var pspServiceUrl = _configuration["PSP:ServiceUrl"] ?? "https://localhost:5000";
+                using var jsonDoc = System.Text.Json.JsonDocument.Parse(jsonContent);
+                var root = jsonDoc.RootElement;
+
+                var webhookType = root.GetProperty("type").GetString();
+                var invoiceData = root.GetProperty("invoice");
+
+                _logger.LogInformation("Processing JSON webhook type: {Type}", webhookType);
+
+                // Extract invoice details
+                var invoiceId = invoiceData.GetProperty("id").GetString();
+                var invoiceState = invoiceData.GetProperty("state").GetString();
+                var customId = "";
+
+                // Extract custom ID from line items
+                if (invoiceData.TryGetProperty("lineItems", out var lineItems) && lineItems.GetArrayLength() > 0)
+                {
+                    var firstItem = lineItems[0];
+                    if (firstItem.TryGetProperty("customId", out var customIdProp))
+                    {
+                        customId = customIdProp.GetString() ?? "";
+                    }
+                }
+
+                // Extract buyer email
+                var buyerEmail = "";
+                if (invoiceData.TryGetProperty("buyer", out var buyer) && buyer.TryGetProperty("email", out var emailProp))
+                {
+                    buyerEmail = emailProp.GetString() ?? "";
+                }
+
+                // Extract amount
+                decimal totalAmount = 0;
+                if (invoiceData.TryGetProperty("amount", out var amountData) && amountData.TryGetProperty("total", out var totalProp))
+                {
+                    totalAmount = totalProp.GetDecimal() / 100; // Convert from cents to dollars
+                }
+
+                _logger.LogInformation("Webhook details: InvoiceId={InvoiceId}, State={State}, CustomId={CustomId}, BuyerEmail={BuyerEmail}, Amount={Amount}",
+                    invoiceId, invoiceState, customId, buyerEmail, totalAmount);
+
+                // Find transaction by invoice ID or custom ID
+                var transaction = await _transactionRepository.GetByTransactionIdAsync(invoiceId);
+                if (transaction == null && !string.IsNullOrEmpty(customId))
+                {
+                    // Try to find by custom ID (PSP transaction ID)
+                    transaction = await FindTransactionByCustomId(customId);
+                }
+
+                if (transaction != null)
+                {
+                    var oldStatus = transaction.Status;
+                    var success = false;
+                    var message = "";
+
+                    switch (webhookType?.ToLower())
+                    {
+                        case "invoicecompleted":
+                            transaction.Status = TransactionStatus.COMPLETED;
+                            transaction.UpdatedAt = DateTime.UtcNow;
+                            success = true;
+                            message = "Payment completed successfully via CoinPayments";
+                            break;
+
+                        case "invoicecancelled":
+                            transaction.Status = TransactionStatus.CANCELLED;
+                            transaction.UpdatedAt = DateTime.UtcNow;
+                            success = false;
+                            message = "Payment cancelled";
+                            break;
+
+                        case "invoiceexpired":
+                            transaction.Status = TransactionStatus.CANCELLED;
+                            transaction.UpdatedAt = DateTime.UtcNow;
+                            success = false;
+                            message = "Payment expired";
+                            break;
+
+                        case "invoicepending":
+                        case "invoicepaid":
+                            transaction.Status = TransactionStatus.PENDING;
+                            break;
+
+                        default:
+                            _logger.LogInformation("Unhandled webhook type: {Type}", webhookType);
+                            break;
+                    }
+
+                    await _transactionRepository.UpdateAsync(transaction);
+
+                    _logger.LogInformation("Updated transaction {TxnId} status from {OldStatus} to {NewStatus}",
+                        transaction.TransactionId, oldStatus, transaction.Status);
+
+                    // Notify PSP for completed or failed payments
+                    if (webhookType?.ToLower() == "invoicecompleted" || webhookType?.ToLower() == "invoicecancelled" || webhookType?.ToLower() == "invoiceexpired")
+                    {
+                        await NotifyPSPAsync(transaction, success, message, customId);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Transaction not found for InvoiceId: {InvoiceId} or CustomId: {CustomId}", invoiceId, customId);
+                }
+
+                return Ok("JSON webhook processed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing JSON webhook");
+                return Ok("JSON webhook error logged");
+            }
+        }
+
+        private async Task<IActionResult> ProcessFormWebhook(string rawContent)
+        {
+            // Original form-based webhook processing
+            var formData = new Dictionary<string, string>();
+            if (!string.IsNullOrEmpty(rawContent))
+            {
+                var pairs = rawContent.Split('&');
+                foreach (var pair in pairs)
+                {
+                    var keyValue = pair.Split('=');
+                    if (keyValue.Length == 2)
+                    {
+                        var key = Uri.UnescapeDataString(keyValue[0]);
+                        var value = Uri.UnescapeDataString(keyValue[1]);
+                        formData[key] = value;
+                    }
+                }
+            }
+
+            _logger.LogInformation("Parsed form IPN data: {Data}", string.Join(", ", formData.Select(kv => $"{kv.Key}={kv.Value}")));
+
+            // Extract key fields
+            var txnId = formData.GetValueOrDefault("txn_id", "");
+            var status = formData.GetValueOrDefault("status", "");
+            var statusText = formData.GetValueOrDefault("status_text", "");
+            var amount1 = formData.GetValueOrDefault("amount1", "");
+            var currency1 = formData.GetValueOrDefault("currency1", "");
+            var buyerEmail = formData.GetValueOrDefault("email", "");
+
+            _logger.LogInformation("Form IPN: TxnId={TxnId}, Status={Status}, StatusText={StatusText}, Amount1={Amount1}, Currency1={Currency1}",
+                txnId, status, statusText, amount1, currency1);
+
+            if (!string.IsNullOrEmpty(txnId))
+            {
+                var transaction = await _transactionRepository.GetByTransactionIdAsync(txnId);
+
+                if (transaction != null)
+                {
+                    if (int.TryParse(status, out int statusCode))
+                    {
+                        var oldStatus = transaction.Status;
+                        var success = false;
+                        var message = statusText ?? "";
+
+                        switch (statusCode)
+                        {
+                            case 0: // Waiting for buyer funds
+                            case 1: // We have confirmed coin reception from the buyer
+                            case 2: // Queued for nightly payout
+                                transaction.Status = TransactionStatus.PENDING;
+                                break;
+                            case 100: // Payment complete
+                                transaction.Status = TransactionStatus.COMPLETED;
+                                transaction.UpdatedAt = DateTime.UtcNow;
+                                success = true;
+                                message = "Payment completed successfully";
+                                await NotifyPSPAsync(transaction, success, message, "");
+                                break;
+                            case -1: // Cancelled / Timed Out
+                                transaction.Status = TransactionStatus.CANCELLED;
+                                transaction.UpdatedAt = DateTime.UtcNow;
+                                success = false;
+                                message = "Payment cancelled or timed out";
+                                await NotifyPSPAsync(transaction, success, message, "");
+                                break;
+                            case -2: // Refunded
+                                transaction.Status = TransactionStatus.CANCELLED;
+                                transaction.UpdatedAt = DateTime.UtcNow;
+                                success = false;
+                                message = "Payment refunded";
+                                await NotifyPSPAsync(transaction, success, message, "");
+                                break;
+                        }
+
+                        await _transactionRepository.UpdateAsync(transaction);
+
+                        _logger.LogInformation("Form IPN: Updated transaction {TxnId} status from {OldStatus} to {NewStatus}",
+                            txnId, oldStatus, transaction.Status);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Transaction not found for TxnId: {TxnId}", txnId);
+                }
+            }
+
+            return Ok("Form IPN received");
+        }
+
+        private async Task<BitcoinPaymentService.Data.Entities.Transaction?> FindTransactionByCustomId(string customId)
+        {
+            try
+            {
+                // This would need to be implemented in the repository
+                // For now, return null and log
+                _logger.LogInformation("Searching for transaction by CustomId: {CustomId}", customId);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error finding transaction by CustomId: {CustomId}", customId);
+                return null;
+            }
+        }
+
+        private async Task NotifyPSPAsync(BitcoinPaymentService.Data.Entities.Transaction transaction, bool success, string message, string customId)
+        {
+            try
+            {
+                var pspServiceUrl = _configuration["PSP:ServiceUrl"] ?? "https://localhost:7001";
                 var callbackUrl = $"{pspServiceUrl}/api/payment-callback/bitcoin";
+
+                // Use custom ID (PSP transaction ID) if available, otherwise use transaction ID
+                var pspTransactionId = !string.IsNullOrEmpty(customId) ? customId : transaction.TransactionId;
 
                 var callbackData = new
                 {
-                    pspTransactionId = transaction.TransactionId, // Use as PSP transaction ID
-                    transactionId = transaction.TransactionId,
-                    status = success ? "completed" : "failed",
-                    amount = transaction.Amount,
-                    currency = transaction.Currency1,
-                    buyerEmail = transaction.BuyerEmail,
-                    message = message,
-                    timestamp = DateTime.UtcNow
+                    PSPTransactionId = pspTransactionId,
+                    PaymentId = transaction.TransactionId, // CoinPayments transaction ID
+                    TransactionId = transaction.TransactionId,
+                    Status = success ? "completed" : "failed",
+                    Amount = transaction.Amount,
+                    Currency = transaction.Currency1 ?? "USD",
+                    CryptoCurrency = "LTCT",
+                    Address = transaction.BuyerEmail, // Using email as placeholder
+                    Message = message,
+                    ExpiresAt = transaction.CreatedAt.AddMinutes(30)
                 };
 
                 var json = System.Text.Json.JsonSerializer.Serialize(callbackData);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
+                _logger.LogInformation("Notifying PSP: URL={Url}, PSPTransactionId={PSPTransactionId}, Status={Status}",
+                    callbackUrl, pspTransactionId, success ? "completed" : "failed");
+
                 var response = await _httpClient.PostAsync(callbackUrl, content);
+                var responseContent = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation("Successfully notified PSP about transaction {TxnId} status: {Success}",
-                        transaction.TransactionId, success);
+                    _logger.LogInformation("Successfully notified PSP about transaction {PSPTransactionId}. Response: {Response}",
+                        pspTransactionId, responseContent);
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to notify PSP about transaction {TxnId}. Status: {StatusCode}",
-                        transaction.TransactionId, response.StatusCode);
+                    _logger.LogWarning("Failed to notify PSP about transaction {PSPTransactionId}. Status: {StatusCode}, Response: {Response}",
+                        pspTransactionId, response.StatusCode, responseContent);
                 }
             }
             catch (Exception ex)
