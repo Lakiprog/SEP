@@ -17,21 +17,7 @@ const HomeNavbar = (props) => {
           </Col>
         </Row>
 
-        <Row className="g-4">
-          <Col md={6} lg={3}>
-            <Card className="h-100 text-center">
-              <CardBody>
-                <div className="text-primary mb-3" style={{ fontSize: "48px", fontWeight: "bold" }}>👥</div>
-                <CardTitle tag="h5">Users</CardTitle>
-                <CardText>
-                  View and manage telecommunications packages
-                </CardText>
-                <Button color="primary" href="/packageDealsUser">
-                  View Packages
-                </Button>
-              </CardBody>
-            </Card>
-          </Col>
+        <Row className="g-4">         
 
           <Col md={6} lg={3}>
             <Card className="h-100 text-center">

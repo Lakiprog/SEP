@@ -53,7 +53,7 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
         
         // If QR payment, store QR code data and show it
         if (paymentType === 'qr' && response.data.qrCode) {
-          console.log('QR kod je generisan uspešno!');
+          console.log('QR code generated successfully!');
           console.log('QR kod data:', response.data.qrCode);
           console.log('QR kod length:', response.data.qrCode.length);
           setQrCodeData({
@@ -66,10 +66,10 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
             message: response.data.message
           });
           console.log('QR kod data set in state');
-          // Ne pozivamo onPaymentComplete - korisnik mora da klikne "Plaćanje završeno"
+          // We don't call onPaymentComplete - user must click "Payment completed"
         } else {
           setSuccess(true);
-          // Call parent callback za ostale tipove plaćanja
+          // Call parent callback for other payment types
           if (onPaymentComplete) {
             onPaymentComplete({
               paymentType,
@@ -126,7 +126,7 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
               <div>
                 <h5>QR Code Payment</h5>
                 <p className="text-muted mb-3">
-                  {qrCodeData.message || "Skenirajte QR kod sa vašom bankovnom aplikacijom da završite plaćanje."}
+                  {qrCodeData.message || "Scan the QR code with your banking app to complete the payment."}
                 </p>
                 
                 <div className="mb-4 text-center">
@@ -148,27 +148,27 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
                         }}
                       />
                       <p className="text-muted mt-2">
-                        <strong>📱 Skenirajte QR kod sa vašom bankovnom aplikacijom</strong>
+                        <strong>📱 Scan the QR code with your banking app</strong>
                       </p>
                     </div>
                   ) : (
                     <div className="alert alert-warning">
-                      QR kod nije generisan.
+                      QR code was not generated.
                     </div>
                   )}
                 </div>
                 
                 <div className="mb-3 p-3 bg-light rounded">
-                  <h6>Detalji plaćanja:</h6>
-                  <p className="mb-1"><strong>Iznos:</strong> {qrCodeData.amount} {qrCodeData.currency}</p>
-                  <p className="mb-1"><strong>Primaoc:</strong> {qrCodeData.receiverName}</p>
-                  <p className="mb-1"><strong>Broj računa:</strong> {qrCodeData.accountNumber}</p>
-                  <p className="mb-0"><strong>ID porudžbine:</strong> {qrCodeData.orderId}</p>
+                  <h6>Payment details:</h6>
+                  <p className="mb-1"><strong>Amount:</strong> {qrCodeData.amount} {qrCodeData.currency}</p>
+                  <p className="mb-1"><strong>Receiver:</strong> {qrCodeData.receiverName}</p>
+                  <p className="mb-1"><strong>Account Number:</strong> {qrCodeData.accountNumber}</p>
+                  <p className="mb-0"><strong>Order ID:</strong> {qrCodeData.orderId}</p>
                 </div>
                 
                 <div className="mb-3">
                   <div className="alert alert-info">
-                    <strong>💡 Uputstvo:</strong> Skenirajte QR kod sa vašom bankovnom aplikacijom, a zatim kliknite "Plaćanje završeno" kada završite transakciju.
+                    <strong>💡 Instructions:</strong> Scan the QR code with your banking app, then click "Payment completed" when you finish the transaction.
                   </div>
                   
                   <div className="d-grid gap-2 d-md-flex justify-content-md-center">
@@ -176,7 +176,7 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
                       color="success" 
                       size="lg"
                       onClick={() => {
-                        console.log('Plaćanje završeno clicked - calling onPaymentComplete');
+                        console.log('Payment completed clicked - calling onPaymentComplete');
                         if (onPaymentComplete) {
                           onPaymentComplete({
                             paymentType: 'qr',
@@ -188,7 +188,7 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
                       }}
                       className="me-2"
                     >
-                      ✅ Plaćanje završeno
+                      ✅ Payment completed
                     </Button>
                     <Button 
                       color="info" 
@@ -199,17 +199,17 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
                             QRCodeData: `BCD\n0002\n1\nAIKBRSBG\n${qrCodeData.receiverName}\n${qrCodeData.accountNumber}\n97\n${qrCodeData.orderId}\nAC01\n${qrCodeData.amount}\n${qrCodeData.currency}`
                           });
                           if (response.data.isValid) {
-                            alert('✅ QR kod je validan prema NBS IPS standardu!');
+                            alert('✅ QR code is valid according to NBS IPS standard!');
                           } else {
-                            alert('❌ QR kod nije validan. Greške: ' + response.data.errors.join(', '));
+                            alert('❌ QR code is not valid. Errors: ' + response.data.errors.join(', '));
                           }
                         } catch (err) {
-                          alert('❌ Greška prilikom validacije QR koda');
+                          alert('❌ Error validating QR code');
                         }
                       }}
                       className="me-2"
                     >
-                      🔍 Validiraj QR kod
+                      🔍 Validate QR code
                     </Button>
                     <Button 
                       color="secondary" 
@@ -219,7 +219,7 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
                         setError('');
                       }}
                     >
-                      🔄 Generiši novi QR kod
+                      🔄 Generate new QR code
                     </Button>
                   </div>
                 </div>
@@ -234,10 +234,10 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
                 </div>
                 <h5>QR Code Payment</h5>
                 <p className="text-muted">
-                  Generišite QR kod za plaćanje putem mobilne bankovne aplikacije.
+                  Generate QR code for payment via mobile banking app.
                 </p>
                 <div className="mb-3">
-                  <strong>Iznos:</strong> {selectedPackage.price * years} RSD
+                  <strong>Amount:</strong> {selectedPackage.price * years} RSD
                 </div>
                 <Button
                   color="primary"
@@ -245,10 +245,10 @@ const PaymentContainer = ({ selectedPaymentType, selectedPackage, years, onPayme
                   disabled={loading}
                   className="me-2"
                 >
-                  {loading ? <Spinner size="sm" /> : 'Generiši QR kod'}
+                  {loading ? <Spinner size="sm" /> : 'Generate QR code'}
                 </Button>
                 <Button color="secondary" onClick={onCancel} disabled={loading}>
-                  Otkaži
+                  Cancel
                 </Button>
               </div>
             )}

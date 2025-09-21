@@ -129,21 +129,21 @@ const CryptoPayment = ({
         // Successful transaction - send PSP callback
         try {
           await bitcoinPaymentService.sendPSPCallback(updatedStatus, true);
-          alert('✅ Plaćanje je uspešno! PSP je obavešten.');
+          alert('✅ Payment successful! PSP has been notified.');
 
           if (onPaymentComplete) {
             onPaymentComplete(updatedStatus);
           }
         } catch (callbackError) {
           console.error('PSP callback failed:', callbackError);
-          alert('✅ Plaćanje je uspešno, ali ima problema sa obaveštavanjem PSP-a.');
+          alert('✅ Payment successful, but there are issues with PSP notification.');
         }
       } else if (newStatus === 'failed' || newStatus === 'cancelled' || newStatus === 'expired') {
         // Failed transaction - send PSP callback
         try {
-          const message = newStatus === 'expired' ? 'Transakcija je istekla' : 'Transakcija je otkazana ili neuspešna';
+          const message = newStatus === 'expired' ? 'Transaction has expired' : 'Transaction was cancelled or unsuccessful';
           await bitcoinPaymentService.sendPSPCallback(updatedStatus, false, message);
-          alert('❌ Plaćanje nije uspešno. PSP je obavešten.');
+          alert('❌ Payment unsuccessful. PSP has been notified.');
 
           if (newStatus === 'expired' && onPaymentExpired) {
             onPaymentExpired(updatedStatus);
@@ -152,15 +152,15 @@ const CryptoPayment = ({
           }
         } catch (callbackError) {
           console.error('PSP callback failed:', callbackError);
-          alert('❌ Plaćanje nije uspešno, takođe ima problema sa obaveštavanjem PSP-a.');
+          alert('❌ Payment unsuccessful, also having issues with PSP notification.');
         }
       } else {
         // Still pending
-        alert('⏳ Transakcija je još uvek u toku. Pokušajte ponovo za nekoliko minuta.');
+        alert('⏳ Transaction is still in progress. Try again in a few minutes.');
       }
     } catch (error) {
       console.error('Error checking status manually:', error);
-      alert('❌ Greška pri proveri statusa: ' + error.message);
+      alert('❌ Error checking status: ' + error.message);
     } finally {
       setCheckingStatus(false);
     }
@@ -281,7 +281,7 @@ const CryptoPayment = ({
                   )}
                 </button>
                 <p className="check-status-help">
-                  Kliknite ovde da proverite da li je plaćanje uspešno završeno
+                  Click here to check if payment has been completed successfully
                 </p>
               </div>
             </>

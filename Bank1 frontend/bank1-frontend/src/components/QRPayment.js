@@ -71,14 +71,14 @@ const QRPayment = () => {
           receiverName: response.data.receiverName,
           orderId: response.data.orderId
         });
-        toast.success('QR kod je uspešno generisan!');
+        toast.success('QR code generated successfully!');
       } else {
         console.log('❌ QR generation failed:', response.data);
-        toast.error('Greška prilikom generisanja QR koda');
+        toast.error('Error generating QR code');
       }
     } catch (error) {
       console.error('Error generating QR code:', error);
-      toast.error('Greška u komunikaciji sa bankom');
+      toast.error('Error communicating with bank');
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ const QRPayment = () => {
 
   const handleVerifyAndPay = async () => {
     if (!paymentData || !paymentId) {
-      toast.error('Podaci o plaćanju nisu dostupni');
+      toast.error('Payment data not available');
       return;
     }
 
@@ -118,7 +118,7 @@ const QRPayment = () => {
       });
 
       if (transactionResponse.data.success) {
-        toast.success('Plaćanje je uspešno izvršeno!');
+        toast.success('Payment completed successfully!');
         
         // Wait a bit for user to see the success message
         setTimeout(() => {
@@ -131,11 +131,11 @@ const QRPayment = () => {
           }
         }, 2000);
       } else {
-        toast.error(`Plaćanje neuspešno: ${transactionResponse.data.message || 'Nepoznata greška'}`);
+        toast.error(`Payment failed: ${transactionResponse.data.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error processing payment:', error);
-      const errorMessage = error.response?.data?.message || 'Greška prilikom obrade plaćanja';
+      const errorMessage = error.response?.data?.message || 'Error processing payment';
       toast.error(errorMessage);
     } finally {
       setVerifying(false);

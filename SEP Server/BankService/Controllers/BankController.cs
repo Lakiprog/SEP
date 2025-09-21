@@ -121,7 +121,7 @@ namespace BankService.Controllers
                     return BadRequest(new { 
                         success = false,
                         error = "No merchants found in database",
-                        message = "Greška: Nema dostupnih trgovaca u sistemu"
+                        message = "Error: No available merchants in the system"
                     });
                 }
                 
@@ -153,7 +153,7 @@ namespace BankService.Controllers
                     accountNumber = request.AccountNumber,
                     receiverName = request.ReceiverName,
                     orderId = request.OrderId,
-                    message = "QR kod je generisan uspešno. Skenirajte kod da biste završili plaćanje."
+                    message = "QR code generated successfully. Scan the code to complete payment."
                 });
             }
             catch (Exception ex)
@@ -162,7 +162,7 @@ namespace BankService.Controllers
                 return BadRequest(new { 
                     success = false,
                     error = ex.Message,
-                    message = "Greška prilikom generisanja QR koda"
+                    message = "Error generating QR code"
                 });
             }
         }
@@ -539,7 +539,7 @@ namespace BankService.Controllers
                     return BadRequest(new 
                     { 
                         success = false,
-                        message = "Transakcija nije pronađena" 
+                        message = "Transaction not found" 
                     });
                 }
 
@@ -818,7 +818,7 @@ namespace BankService.Controllers
                 return BadRequest(new { 
                     success = false,
                     error = ex.Message,
-                    message = "Greška prilikom validacije QR koda"
+                    message = "Error validating QR code"
                 });
             }
         }
@@ -851,7 +851,7 @@ namespace BankService.Controllers
                     return Ok(new PSPQRValidationResponse
                     {
                         IsValid = false,
-                        ErrorMessage = "QR kod ne sadrži validne podatke o plaćanju",
+                        ErrorMessage = "QR code does not contain valid payment data",
                         ParsedData = null
                     });
                 }
@@ -866,7 +866,7 @@ namespace BankService.Controllers
                     return Ok(new PSPQRValidationResponse
                     {
                         IsValid = false,
-                        ErrorMessage = "QR kod ne sadrži informacije o iznosu",
+                        ErrorMessage = "QR code does not contain amount information",
                         ParsedData = null
                     });
                 }
@@ -894,7 +894,7 @@ namespace BankService.Controllers
                     return Ok(new PSPQRValidationResponse
                     {
                         IsValid = false,
-                        ErrorMessage = $"Valuta u QR kodu ({qrCurrency}) se ne poklapa sa očekivanom valutom ({request.ExpectedCurrency})",
+                        ErrorMessage = $"Currency in QR code ({qrCurrency}) does not match expected currency ({request.ExpectedCurrency})",
                         ParsedData = parsedDataObject
                     });
                 }
@@ -906,7 +906,7 @@ namespace BankService.Controllers
                     return Ok(new PSPQRValidationResponse
                     {
                         IsValid = false,
-                        ErrorMessage = $"Iznos u QR kodu ({qrAmount:F2}) se ne poklapa sa očekivanim iznosom ({request.ExpectedAmount:F2})",
+                        ErrorMessage = $"Amount in QR code ({qrAmount:F2}) does not match expected amount ({request.ExpectedAmount:F2})",
                         ParsedData = parsedDataObject
                     });
                 }
@@ -929,7 +929,7 @@ namespace BankService.Controllers
                 return Ok(new PSPQRValidationResponse
                 {
                     IsValid = false,
-                    ErrorMessage = $"Greška prilikom validacije QR koda: {ex.Message}",
+                    ErrorMessage = $"Error validating QR code: {ex.Message}",
                     ParsedData = null
                 });
             }

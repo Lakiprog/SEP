@@ -27,7 +27,7 @@ namespace PaymentCardCenterService.Models
         
         public DateTime? UpdatedAt { get; set; }
         
-        // Navigation property - jedna banka može imati više BIN kodova
+        // Navigation property - one bank can have multiple BIN codes
         public virtual ICollection<BinRange> BinRanges { get; set; } = new List<BinRange>();
     }
 }
