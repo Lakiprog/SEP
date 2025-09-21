@@ -53,15 +53,42 @@ namespace PaymentServiceProvider.Services.Plugins
                 if (response.IsSuccessStatusCode)
                 {
                     var responseJson = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation("BitcoinPaymentService response: {ResponseJson}", responseJson);
+
                     var paymentResponse = JsonSerializer.Deserialize<JsonElement>(responseJson);
 
                     // Extract CoinPayments checkout URL
-                    var checkoutUrl = paymentResponse.GetProperty("checkoutUrl").GetString();
-                    var transactionId = paymentResponse.GetProperty("transactionId").GetString();
+                    var checkoutUrl = "";
+                    var transactionId = "";
+
+                    // Try different property names based on BitcoinController response
+                    if (paymentResponse.TryGetProperty("qrcodeUrl", out var qrcodeUrlProp))
+                    {
+                        checkoutUrl = qrcodeUrlProp.GetString();
+                        _logger.LogInformation("Found qrcodeUrl: {CheckoutUrl}", checkoutUrl);
+                    }
+                    else if (paymentResponse.TryGetProperty("checkoutUrl", out var checkoutUrlProp))
+                    {
+                        checkoutUrl = checkoutUrlProp.GetString();
+                        _logger.LogInformation("Found checkoutUrl: {CheckoutUrl}", checkoutUrl);
+                    }
+
+                    if (paymentResponse.TryGetProperty("transactionId", out var txnIdProp))
+                    {
+                        transactionId = txnIdProp.GetString();
+                        _logger.LogInformation("Found transactionId: {TransactionId}", transactionId);
+                    }
+
+                    // If no checkout URL found, generate one manually using transaction ID
+                    if (string.IsNullOrEmpty(checkoutUrl) && !string.IsNullOrEmpty(transactionId))
+                    {
+                        checkoutUrl = $"https://a-checkout.coinpayments.net/checkout/?invoice-id={transactionId}";
+                        _logger.LogInformation("Generated manual CoinPayments checkout URL: {CheckoutUrl}", checkoutUrl);
+                    }
 
                     if (!string.IsNullOrEmpty(checkoutUrl))
                     {
-                        _logger.LogInformation("Generated CoinPayments checkout URL: {CheckoutUrl} for transaction {TransactionId}",
+                        _logger.LogInformation("Using CoinPayments checkout URL: {CheckoutUrl} for transaction {TransactionId}",
                             checkoutUrl, transactionId);
 
                         return new PaymentResponse

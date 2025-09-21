@@ -653,10 +653,20 @@ namespace BitcoinPaymentService.Services
                 if (jsonResponse?.invoices != null && jsonResponse.invoices.Count > 0)
                 {
                     var invoice = jsonResponse.invoices[0];
-                    result["txn_id"] = invoice.id?.ToString() ?? "";
+                    var invoiceId = invoice.id?.ToString() ?? "";
+
+                    result["txn_id"] = invoiceId;
                     result["address"] = "mkDukuskLXmotjurnWXYsyxzN7G6rBXFec"; // Default test address
                     result["status_url"] = invoice.link?.ToString() ?? "";
-                    result["qrcode_url"] = invoice.checkoutLink?.ToString() ?? "";
+
+                    // Get checkout URL or generate it manually if not provided
+                    var checkoutUrl = invoice.checkoutLink?.ToString() ?? "";
+                    if (string.IsNullOrEmpty(checkoutUrl) && !string.IsNullOrEmpty(invoiceId))
+                    {
+                        checkoutUrl = $"https://a-checkout.coinpayments.net/checkout/?invoice-id={invoiceId}";
+                    }
+                    result["qrcode_url"] = checkoutUrl;
+
                     result["amount"] = "0"; // Will be set from request
                     result["timeout"] = "1800"; // 30 minutes default
                     result["confirms_needed"] = "1";
