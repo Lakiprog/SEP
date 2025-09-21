@@ -265,6 +265,8 @@ namespace BitcoinPaymentService.Services
                         successUrl = $"https://localhost:7006/api/payment-callback/bitcoin/return?status=completed&pspTransactionId={Uri.EscapeDataString(request.ItemNumber ?? "")}",
                         cancelUrl = $"https://localhost:7006/api/payment-callback/bitcoin/return?status=cancelled&pspTransactionId={Uri.EscapeDataString(request.ItemNumber ?? "")}"
                     },
+                    // Add IPN URL for payment status notifications
+                    ipnUrl = _config.WebhookUrl,
                     // Add webhook configuration for payment status notifications
                     webhook = new
                     {
@@ -716,34 +718,41 @@ namespace BitcoinPaymentService.Services
         /// <summary>
         /// Register webhook with CoinPayments for invoice notifications
         /// Based on: https://a-docs.coinpayments.net/api/webhooks/clients/setup
+        /// Uses the correct endpoint: /merchant/clients/{clientId}/webhooks
         /// </summary>
         public async Task<bool> RegisterWebhookAsync()
         {
             try
             {
-                _logger.LogInformation("Registering CoinPayments webhook: {WebhookUrl}", _config.WebhookUrl);
+                _logger.LogInformation("Registering CoinPayments webhook: {WebhookUrl} for client: {ClientId}", _config.WebhookUrl, _config.ClientId);
 
-                // Create webhook registration payload
+                // Create webhook registration payload according to CoinPayments API docs
                 var webhookPayload = new
                 {
                     url = _config.WebhookUrl,
-                    events = new[]
+                    notificationTypes = new[]
                     {
-                        "invoiceCreated",
-                        "invoicePending",
-                        "invoicePaid",
-                        "invoiceCompleted",
-                        "invoiceCancelled",
-                        "invoiceTimedOut",
-                        "paymentCreated",
-                        "paymentTimedOut"
+                        "invoice.created",
+                        "invoice.pending",
+                        "invoice.paid",
+                        "invoice.completed",
+                        "invoice.cancelled",
+                        "invoice.expired",
+                        "payment.created",
+                        "payment.pending",
+                        "payment.confirmed",
+                        "payment.completed",
+                        "payment.failed"
                     },
-                    description = "PSP Invoice Status Notifications"
+                    description = "PSP Bitcoin Payment Service Notifications",
+                    isActive = true
                 };
 
                 string jsonPayload = JsonConvert.SerializeObject(webhookPayload);
                 string timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
-                string url = "https://a-api.coinpayments.net/api/v2/merchant/webhooks";
+
+                // Use the correct endpoint with clientId in URL path according to documentation
+                string url = $"https://a-api.coinpayments.net/api/v1/merchant/clients/{_config.ClientId}/webhooks";
 
                 // Generate signature for webhook registration
                 string signature = GenerateCoinPaymentsSignature("POST", url, _config.ClientId, timestamp, jsonPayload, _config.ClientSecret);
@@ -756,8 +765,9 @@ namespace BitcoinPaymentService.Services
                 httpRequest.Headers.Add("X-CoinPayments-Timestamp", timestamp);
                 httpRequest.Headers.Add("X-CoinPayments-Signature", signature);
 
-                _logger.LogInformation("Sending webhook registration request");
+                _logger.LogInformation("Sending webhook registration request to: {Url}", url);
                 _logger.LogInformation("Webhook payload: {Payload}", jsonPayload);
+                _logger.LogInformation("Using ClientId: {ClientId}", _config.ClientId);
 
                 var httpResponse = await _httpClient.SendAsync(httpRequest);
                 var responseContent = await httpResponse.Content.ReadAsStringAsync();
@@ -767,7 +777,7 @@ namespace BitcoinPaymentService.Services
 
                 if (httpResponse.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation("Successfully registered webhook with CoinPayments");
+                    _logger.LogInformation("Successfully registered webhook with CoinPayments for client {ClientId}", _config.ClientId);
                     return true;
                 }
                 else
@@ -779,20 +789,20 @@ namespace BitcoinPaymentService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error registering webhook with CoinPayments");
+                _logger.LogError(ex, "Error registering webhook with CoinPayments for client {ClientId}", _config.ClientId);
                 return false;
             }
         }
 
         /// <summary>
-        /// List registered webhooks from CoinPayments
+        /// List registered webhooks from CoinPayments for specific client
         /// </summary>
         public async Task<bool> ListWebhooksAsync()
         {
             try
             {
                 string timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
-                string url = "https://a-api.coinpayments.net/api/v2/merchant/webhooks";
+                string url = $"https://a-api.coinpayments.net/api/v1/merchant/clients/{_config.ClientId}/webhooks";
                 string payload = ""; // GET request has empty payload
 
                 // Generate signature for webhook listing
@@ -805,7 +815,7 @@ namespace BitcoinPaymentService.Services
                 httpRequest.Headers.Add("X-CoinPayments-Timestamp", timestamp);
                 httpRequest.Headers.Add("X-CoinPayments-Signature", signature);
 
-                _logger.LogInformation("Listing registered webhooks");
+                _logger.LogInformation("Listing registered webhooks for client: {ClientId}", _config.ClientId);
 
                 var httpResponse = await _httpClient.SendAsync(httpRequest);
                 var responseContent = await httpResponse.Content.ReadAsStringAsync();
@@ -817,7 +827,7 @@ namespace BitcoinPaymentService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error listing webhooks from CoinPayments");
+                _logger.LogError(ex, "Error listing webhooks from CoinPayments for client {ClientId}", _config.ClientId);
                 return false;
             }
         }
@@ -852,14 +862,14 @@ namespace BitcoinPaymentService.Services
         }
 
         /// <summary>
-        /// Check if our webhook URL is already registered
+        /// Check if our webhook URL is already registered for this client
         /// </summary>
         private async Task<bool> IsWebhookRegisteredAsync()
         {
             try
             {
                 string timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
-                string url = "https://a-api.coinpayments.net/api/v2/merchant/webhooks";
+                string url = $"https://a-api.coinpayments.net/api/v1/merchant/clients/{_config.ClientId}/webhooks";
                 string payload = ""; // GET request has empty payload
 
                 // Generate signature for webhook listing
@@ -886,7 +896,7 @@ namespace BitcoinPaymentService.Services
                         {
                             if (webhook?.url?.ToString() == _config.WebhookUrl)
                             {
-                                _logger.LogInformation("Found existing webhook: {WebhookUrl}", _config.WebhookUrl);
+                                _logger.LogInformation("Found existing webhook: {WebhookUrl} for client: {ClientId}", _config.WebhookUrl, _config.ClientId);
                                 return true;
                             }
                         }
@@ -897,7 +907,7 @@ namespace BitcoinPaymentService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking webhook registration");
+                _logger.LogError(ex, "Error checking webhook registration for client {ClientId}", _config.ClientId);
                 return false;
             }
         }

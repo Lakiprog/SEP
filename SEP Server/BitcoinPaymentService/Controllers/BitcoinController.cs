@@ -375,6 +375,168 @@ namespace BitcoinPaymentService.Controllers
             }
         }
 
+        [HttpPost("coinpayments-ipn")]
+        public async Task<IActionResult> CoinPaymentsIPN()
+        {
+            try
+            {
+                _logger.LogInformation("Received CoinPayments IPN notification");
+
+                // Read raw POST data
+                using var reader = new StreamReader(Request.Body);
+                var rawContent = await reader.ReadToEndAsync();
+
+                _logger.LogInformation("CoinPayments IPN Raw Content: {Content}", rawContent);
+
+                // Parse form data
+                var formData = new Dictionary<string, string>();
+                if (!string.IsNullOrEmpty(rawContent))
+                {
+                    var pairs = rawContent.Split('&');
+                    foreach (var pair in pairs)
+                    {
+                        var keyValue = pair.Split('=');
+                        if (keyValue.Length == 2)
+                        {
+                            var key = Uri.UnescapeDataString(keyValue[0]);
+                            var value = Uri.UnescapeDataString(keyValue[1]);
+                            formData[key] = value;
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Parsed IPN data: {Data}", string.Join(", ", formData.Select(kv => $"{kv.Key}={kv.Value}")));
+
+                // Extract key fields
+                var txnId = formData.GetValueOrDefault("txn_id", "");
+                var status = formData.GetValueOrDefault("status", "");
+                var statusText = formData.GetValueOrDefault("status_text", "");
+                var amount1 = formData.GetValueOrDefault("amount1", "");
+                var amount2 = formData.GetValueOrDefault("amount2", "");
+                var currency1 = formData.GetValueOrDefault("currency1", "");
+                var currency2 = formData.GetValueOrDefault("currency2", "");
+                var buyerEmail = formData.GetValueOrDefault("email", "");
+
+                _logger.LogInformation("CoinPayments IPN: TxnId={TxnId}, Status={Status}, StatusText={StatusText}, Amount1={Amount1}, Currency1={Currency1}",
+                    txnId, status, statusText, amount1, currency1);
+
+                if (!string.IsNullOrEmpty(txnId))
+                {
+                    // Find transaction by transaction ID
+                    var transaction = await _transactionRepository.GetByTransactionIdAsync(txnId);
+
+                    if (transaction != null)
+                    {
+                        // Parse status as integer
+                        if (int.TryParse(status, out int statusCode))
+                        {
+                            var oldStatus = transaction.Status;
+
+                            switch (statusCode)
+                            {
+                                case 0: // Waiting for buyer funds
+                                    transaction.Status = TransactionStatus.PENDING;
+                                    break;
+                                case 1: // We have confirmed coin reception from the buyer
+                                    transaction.Status = TransactionStatus.PENDING;
+                                    break;
+                                case 2: // Queued for nightly payout (if auto_confirm was disabled)
+                                    transaction.Status = TransactionStatus.PENDING;
+                                    break;
+                                case 100: // Payment complete
+                                    transaction.Status = TransactionStatus.COMPLETED;
+                                    transaction.UpdatedAt = DateTime.UtcNow;
+
+                                    // Notify PSP about completed payment
+                                    await NotifyPSPAsync(transaction, true, "Payment completed successfully");
+                                    break;
+                                case -1: // Cancelled / Timed Out
+                                    transaction.Status = TransactionStatus.CANCELLED;
+                                    transaction.UpdatedAt = DateTime.UtcNow;
+
+                                    // Notify PSP about failed payment
+                                    await NotifyPSPAsync(transaction, false, "Payment cancelled or timed out");
+                                    break;
+                                case -2: // Refunded
+                                    transaction.Status = TransactionStatus.CANCELLED;
+                                    transaction.UpdatedAt = DateTime.UtcNow;
+
+                                    // Notify PSP about refunded payment
+                                    await NotifyPSPAsync(transaction, false, "Payment refunded");
+                                    break;
+                                default:
+                                    _logger.LogWarning("Unknown CoinPayments status code: {StatusCode}", statusCode);
+                                    break;
+                            }
+
+                            await _transactionRepository.UpdateAsync(transaction);
+
+                            _logger.LogInformation("CoinPayments IPN: Updated transaction {TxnId} status from {OldStatus} to {NewStatus}",
+                                txnId, oldStatus, transaction.Status);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Could not parse status code: {Status}", status);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Transaction not found for TxnId: {TxnId}", txnId);
+                    }
+                }
+
+                // Return 200 OK to acknowledge receipt
+                return Ok("IPN received");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing CoinPayments IPN");
+                // Still return 200 to prevent CoinPayments from retrying
+                return Ok("IPN error logged");
+            }
+        }
+
+        private async Task NotifyPSPAsync(BitcoinPaymentService.Data.Entities.Transaction transaction, bool success, string message)
+        {
+            try
+            {
+                var pspServiceUrl = _configuration["PSP:ServiceUrl"] ?? "https://localhost:5000";
+                var callbackUrl = $"{pspServiceUrl}/api/payment-callback/bitcoin";
+
+                var callbackData = new
+                {
+                    pspTransactionId = transaction.TransactionId, // Use as PSP transaction ID
+                    transactionId = transaction.TransactionId,
+                    status = success ? "completed" : "failed",
+                    amount = transaction.Amount,
+                    currency = transaction.Currency1,
+                    buyerEmail = transaction.BuyerEmail,
+                    message = message,
+                    timestamp = DateTime.UtcNow
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(callbackData);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync(callbackUrl, content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Successfully notified PSP about transaction {TxnId} status: {Success}",
+                        transaction.TransactionId, success);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to notify PSP about transaction {TxnId}. Status: {StatusCode}",
+                        transaction.TransactionId, response.StatusCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error notifying PSP about transaction {TxnId}", transaction.TransactionId);
+            }
+        }
+
         [HttpGet("transaction-info/{transactionId}")]
         public async Task<IActionResult> GetTransactionInfo(string transactionId)
         {
@@ -615,6 +777,218 @@ namespace BitcoinPaymentService.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+
+        [HttpPost("register-webhook")]
+        public async Task<IActionResult> RegisterWebhook()
+        {
+            try
+            {
+                var result = await _coinPaymentsService.RegisterWebhookAsync();
+
+                if (result)
+                {
+                    return Ok(new { message = "Webhook registered successfully" });
+                }
+                else
+                {
+                    return BadRequest(new { error = "Failed to register webhook" });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error registering webhook");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("create-webhook-direct")]
+        public async Task<IActionResult> CreateWebhookDirect([FromBody] CreateWebhookRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("Creating webhook directly via CoinPayments API");
+
+                // Create webhook payload according to CoinPayments API v1 documentation
+                var webhookPayload = new
+                {
+                    url = request.Url ?? _configuration["CoinPayments:WebhookUrl"],
+                    notificationTypes = request.NotificationTypes ?? new[]
+                    {
+                        "invoice.created",
+                        "invoice.pending",
+                        "invoice.paid",
+                        "invoice.completed",
+                        "invoice.cancelled",
+                        "invoice.expired",
+                        "payment.created",
+                        "payment.pending",
+                        "payment.confirmed",
+                        "payment.completed",
+                        "payment.failed"
+                    },
+                    description = request.Description ?? "PSP Bitcoin Payment Service Webhook",
+                    isActive = true
+                };
+
+                var clientId = _configuration["CoinPayments:ClientId"];
+                var clientSecret = _configuration["CoinPayments:ClientSecret"];
+
+                string jsonPayload = System.Text.Json.JsonSerializer.Serialize(webhookPayload);
+                string timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
+                string url = $"https://a-api.coinpayments.net/api/v1/merchant/clients/{clientId}/webhooks";
+
+                // Generate signature for webhook creation
+                using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(clientSecret));
+                string bom = "\ufeff";
+                string message = $"{bom}POST{url}{clientId}{timestamp}{jsonPayload}";
+                var hashBytes = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(message));
+                string signature = Convert.ToBase64String(hashBytes);
+
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+                httpRequest.Content = new StringContent(jsonPayload, System.Text.Encoding.UTF8, "application/json");
+
+                // Add required headers for CoinPayments API v1
+                httpRequest.Headers.Add("X-CoinPayments-Client", clientId);
+                httpRequest.Headers.Add("X-CoinPayments-Timestamp", timestamp);
+                httpRequest.Headers.Add("X-CoinPayments-Signature", signature);
+
+                _logger.LogInformation("Sending webhook creation request to: {Url}", url);
+                _logger.LogInformation("Webhook payload: {Payload}", jsonPayload);
+                _logger.LogInformation("Using ClientId: {ClientId}", clientId);
+                _logger.LogInformation("Signature: {Signature}", signature);
+
+                var httpResponse = await _httpClient.SendAsync(httpRequest);
+                var responseContent = await httpResponse.Content.ReadAsStringAsync();
+
+                _logger.LogInformation("Webhook creation response: {StatusCode}", httpResponse.StatusCode);
+                _logger.LogInformation("Response body: {ResponseBody}", responseContent);
+
+                if (httpResponse.IsSuccessStatusCode)
+                {
+                    return Ok(new
+                    {
+                        message = "Webhook created successfully",
+                        webhookUrl = webhookPayload.url,
+                        response = responseContent
+                    });
+                }
+                else
+                {
+                    return BadRequest(new
+                    {
+                        error = "Failed to create webhook",
+                        status = httpResponse.StatusCode,
+                        response = responseContent
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating webhook directly");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpGet("list-webhooks")]
+        public async Task<IActionResult> ListWebhooks()
+        {
+            try
+            {
+                var result = await _coinPaymentsService.ListWebhooksAsync();
+
+                if (result)
+                {
+                    return Ok(new { message = "Webhooks listed successfully" });
+                }
+                else
+                {
+                    return BadRequest(new { error = "Failed to list webhooks" });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listing webhooks");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("create-webhook-ngrok")]
+        public async Task<IActionResult> CreateWebhookNgrok()
+        {
+            try
+            {
+                var request = new CreateWebhookRequest
+                {
+                    Url = "https://d465af3dfcab.ngrok-free.app/api/bitcoin/coinpayments-ipn",
+                    Description = "PSP Bitcoin Payment Service - Ngrok Webhook"
+                };
+
+                return await CreateWebhookDirect(request);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating ngrok webhook");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("simulate-ipn/{transactionId}")]
+        public async Task<IActionResult> SimulateIPN(string transactionId, [FromQuery] int status = 100)
+        {
+            try
+            {
+                // Simulate CoinPayments IPN data
+                var ipnData = new Dictionary<string, string>
+                {
+                    ["txn_id"] = transactionId,
+                    ["status"] = status.ToString(),
+                    ["status_text"] = status switch
+                    {
+                        0 => "Waiting for buyer funds",
+                        1 => "We have confirmed coin reception from the buyer",
+                        2 => "Queued for nightly payout",
+                        100 => "Payment Complete",
+                        -1 => "Cancelled / Timed Out",
+                        -2 => "Refunded",
+                        _ => "Unknown"
+                    },
+                    ["amount1"] = "10.00",
+                    ["amount2"] = "0.00008772",
+                    ["currency1"] = "USD",
+                    ["currency2"] = "LTCT",
+                    ["email"] = "test@example.com"
+                };
+
+                var formData = string.Join("&", ipnData.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
+
+                // Call our own IPN endpoint
+                var request = new HttpRequestMessage(HttpMethod.Post, "/api/bitcoin/coinpayments-ipn")
+                {
+                    Content = new StringContent(formData, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded")
+                };
+
+                // Simulate the IPN call
+                using var httpClient = new HttpClient();
+                httpClient.BaseAddress = new Uri("https://localhost:7002");
+
+                var response = await httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                return Ok(new
+                {
+                    message = "IPN simulation sent",
+                    transactionId = transactionId,
+                    status = status,
+                    response = responseContent,
+                    statusCode = response.StatusCode
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error simulating IPN");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
     }
 
     public class CreateInvoicePaymentRequest
@@ -644,6 +1018,13 @@ namespace BitcoinPaymentService.Controllers
         public int Status { get; set; }
         public decimal Amount { get; set; }
         public string Currency { get; set; } = string.Empty;
+    }
+
+    public class CreateWebhookRequest
+    {
+        public string? Url { get; set; }
+        public string[]? NotificationTypes { get; set; }
+        public string? Description { get; set; }
     }
 
     public class BitcoinPayment
