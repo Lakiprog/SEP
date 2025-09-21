@@ -409,7 +409,7 @@ namespace BankService.Controllers
             };
         }
 
-        [HttpPost("issuer/process")]
+        [HttpPost("issuer-payment")]
         public async Task<IActionResult> ProcessIssuerRequest([FromBody] PaymentCardCenterService.Dto.IssuerBankRequest request)
         {
             try

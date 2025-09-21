@@ -191,33 +191,6 @@ const PackageDealsAdmin = () => {
               </CardBody>
             </Card>
           </Col>
-          <Col md={3}>
-            <Card className="text-center border-0 shadow-sm">
-              <CardBody className="bg-success text-white">
-                <div className="mb-2" style={{ fontSize: "32px", fontWeight: "bold" }}>✓</div>
-                <h3>{packages.filter(p => p.active).length}</h3>
-                <p className="mb-0">Active Packages</p>
-              </CardBody>
-            </Card>
-          </Col>
-          <Col md={3}>
-            <Card className="text-center border-0 shadow-sm">
-              <CardBody className="bg-info text-white">
-                <div className="mb-2" style={{ fontSize: "32px", fontWeight: "bold" }}>👥</div>
-                <h3>25</h3>
-                <p className="mb-0">Users</p>
-              </CardBody>
-            </Card>
-          </Col>
-          <Col md={3}>
-            <Card className="text-center border-0 shadow-sm">
-              <CardBody className="bg-warning text-white">
-                <div className="mb-2" style={{ fontSize: "32px", fontWeight: "bold" }}>📊</div>
-                <h3>€{packages.reduce((sum, p) => sum + p.price, 0)}</h3>
-                <p className="mb-0">Total Revenue</p>
-              </CardBody>
-            </Card>
-          </Col>
         </Row>
 
         {/* Action Buttons */}
@@ -228,12 +201,6 @@ const PackageDealsAdmin = () => {
           <div>
             <Button color="primary" className="me-2" onClick={onAdd}>
               ➕ Add Package
-            </Button>
-            <Button color="secondary" className="me-2">
-              🔍 Search
-            </Button>
-            <Button color="info">
-              🔧 Filter
             </Button>
           </div>
         </div>
@@ -247,7 +214,7 @@ const PackageDealsAdmin = () => {
                   <th><span className="me-2">📦</span>ID</th>
                   <th><span className="me-2">📦</span>Name</th>
                   <th><span className="me-2">⭐</span>Category</th>
-                  <th><span className="me-2">💖</span>Price (€)</th>
+                  <th><span className="me-2">💖</span>Price (USD)</th>
                   <th><span className="me-2">ℹ️</span>Status</th>
                   <th><span className="me-2">⚙️</span>Actions</th>
                 </tr>
@@ -263,7 +230,7 @@ const PackageDealsAdmin = () => {
                       <Badge color="info">{pkg.category ? pkg.category.name : 'No Category'}</Badge>
                     </td>
                     <td>
-                      <span className="fw-bold text-success">€{pkg.price}</span>
+                      <span className="fw-bold text-success">USD{pkg.price}</span>
                     </td>
                     <td>{getStatusBadge(pkg.isActive)}</td>
                     <td>
@@ -284,31 +251,7 @@ const PackageDealsAdmin = () => {
           </CardBody>
         </Card>
 
-        {/* Quick Actions */}
-        <Row className="mt-4">
-          <Col md={6}>
-            <Card className="border-0 shadow-sm">
-              <CardBody className="text-center">
-                <div className="text-primary mb-3" style={{ fontSize: "32px", fontWeight: "bold" }}>⬇️</div>
-                <h5>Download Report</h5>
-                <Button color="outline-primary">
-                  ⬇️ Excel
-                </Button>
-              </CardBody>
-            </Card>
-          </Col>
-          <Col md={6}>
-            <Card className="border-0 shadow-sm">
-              <CardBody className="text-center">
-                <div className="text-success mb-3" style={{ fontSize: "32px", fontWeight: "bold" }}>🖨️</div>
-                <h5>Print</h5>
-                <Button color="outline-success">
-                  🖨️ PDF
-                </Button>
-              </CardBody>
-            </Card>
-          </Col>
-        </Row>
+      
 
         {/* Modal */}
         <Modal isOpen={showModal} toggle={() => setShowModal(false)}>

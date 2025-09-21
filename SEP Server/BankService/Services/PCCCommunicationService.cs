@@ -57,7 +57,12 @@ namespace BankService.Services
                 if (response.IsSuccessStatusCode)
                 {
                     var responseContent = await response.Content.ReadAsStringAsync();
-                    var pccResponse = JsonSerializer.Deserialize<PCCResponse>(responseContent);
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    };
+                    var pccResponse = JsonSerializer.Deserialize<PCCResponse>(responseContent, options);
                     
                     _logger.LogInformation($"PCC response received: {pccResponse?.Success}");
                     return pccResponse ?? new PCCResponse
@@ -105,7 +110,12 @@ namespace BankService.Services
                 if (response.IsSuccessStatusCode)
                 {
                     var responseContent = await response.Content.ReadAsStringAsync();
-                    var pccResponse = JsonSerializer.Deserialize<PCCResponse>(responseContent);
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    };
+                    var pccResponse = JsonSerializer.Deserialize<PCCResponse>(responseContent, options);
                     
                     _logger.LogInformation($"PCC status response received: {pccResponse?.Success}");
                     return pccResponse ?? new PCCResponse
