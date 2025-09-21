@@ -45,11 +45,14 @@ namespace BankService.Services
                     return new CardValidationResult { IsValid = false, ErrorMessage = "Invalid card number format" };
                 }
 
-                // Check if card exists in database
+                // Check if card exists in this bank's database
                 var card = await _paymentCardRepository.GetByPANAsync(pan);
                 if (card == null)
                 {
-                    return new CardValidationResult { IsValid = false, ErrorMessage = "Card not found" };
+                    // Card not found in local database - this could be an external card
+                    // For basic format validation, we'll accept it for inter-bank transactions
+                    // The actual validation will be done by the issuing bank via PCC
+                    return new CardValidationResult { IsValid = true, ErrorMessage = "External card - validation delegated to issuing bank" };
                 }
 
                 // Validate security code
