@@ -631,7 +631,7 @@ namespace BitcoinPaymentService.Controllers
         {
             try
             {
-                var pspServiceUrl = _configuration["PSP:ServiceUrl"] ?? "https://localhost:7001";
+                var pspServiceUrl = _configuration["PSP:ServiceUrl"] ?? "https://localhost:7006";
                 var callbackUrl = $"{pspServiceUrl}/api/payment-callback/bitcoin";
 
                 // Use custom ID (PSP transaction ID) if available, otherwise use transaction ID
@@ -662,12 +662,12 @@ namespace BitcoinPaymentService.Controllers
 
                 if (response.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation("Successfully notified PSP about transaction {PSPTransactionId}. Response: {Response}",
+                    _logger.LogInformation($"Successfully notified PSP about transaction {callbackData.PSPTransactionId}. Response: {Response}",
                         pspTransactionId, responseContent);
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to notify PSP about transaction {PSPTransactionId}. Status: {StatusCode}, Response: {Response}",
+                    _logger.LogWarning($"Failed to notify PSP about transaction {callbackData.PSPTransactionId}. Status: {callbackData.Status}, Response: {Response}",
                         pspTransactionId, response.StatusCode, responseContent);
                 }
             }
