@@ -7,5 +7,6 @@ namespace PaymentServiceProvider.Interfaces
     {
         Task<Transaction> GetByPSPTransactionId(string pspTransactionId);
         Task<Transaction> GetByMerchantOrderId(string merchantOrderId);
+        Task<Transaction?> GetByExternalTransactionId(string externalTransactionId);
     }
 }

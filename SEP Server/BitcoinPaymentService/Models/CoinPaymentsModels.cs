@@ -449,4 +449,5 @@ namespace BitcoinPaymentService.Models
         [JsonProperty("currency")]
         public string Currency { get; set; } = string.Empty;
     }
+
 }

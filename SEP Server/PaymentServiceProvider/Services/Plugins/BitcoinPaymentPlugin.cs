@@ -30,10 +30,92 @@ namespace PaymentServiceProvider.Services.Plugins
             {
                 _logger.LogInformation("Processing Bitcoin payment for transaction {TransactionId}", transaction.PSPTransactionId);
 
-                // Generate crypto-frontend URL with payment parameters
-                var cryptoFrontendUrl = "http://localhost:3003";
+                // Get Bitcoin service URL from Consul or use fallback
+                var bitcoinServiceUrl = await _serviceDiscovery.GetServiceUrlAsync("bitcoin-payment-service") ?? _fallbackUrl;
 
-                // Create URL parameters for the crypto payment
+                // Create request for BitcoinPaymentService
+                var createQRPaymentRequest = new
+                {
+                    Amount = request.Amount,
+                    Currency = "LTCT", // Default crypto currency
+                    OrderId = transaction.PSPTransactionId,
+                    BuyerEmail = "user@example.com", // Default email or get from transaction
+                    ItemName = $"Payment to {transaction.WebShopClient?.Name ?? "Merchant"}",
+                    TelecomServiceId = Guid.NewGuid() // Generate or use transaction data
+                };
+
+                var json = JsonSerializer.Serialize(createQRPaymentRequest);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                // Call BitcoinPaymentService to create payment and get CoinPayments checkout URL
+                var response = await _httpClient.PostAsync($"{bitcoinServiceUrl}/api/bitcoin/create-qr-payment", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseJson = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation("BitcoinPaymentService response: {ResponseJson}", responseJson);
+
+                    var paymentResponse = JsonSerializer.Deserialize<JsonElement>(responseJson);
+
+                    // Extract CoinPayments checkout URL
+                    var checkoutUrl = "";
+                    var transactionId = "";
+
+                    // Try different property names based on BitcoinController response
+                    if (paymentResponse.TryGetProperty("qrcodeUrl", out var qrcodeUrlProp))
+                    {
+                        checkoutUrl = qrcodeUrlProp.GetString();
+                        _logger.LogInformation("Found qrcodeUrl: {CheckoutUrl}", checkoutUrl);
+                    }
+                    else if (paymentResponse.TryGetProperty("checkoutUrl", out var checkoutUrlProp))
+                    {
+                        checkoutUrl = checkoutUrlProp.GetString();
+                        _logger.LogInformation("Found checkoutUrl: {CheckoutUrl}", checkoutUrl);
+                    }
+
+                    if (paymentResponse.TryGetProperty("transactionId", out var txnIdProp))
+                    {
+                        transactionId = txnIdProp.GetString();
+                        _logger.LogInformation("Found transactionId: {TransactionId}", transactionId);
+                    }
+
+                    // If no checkout URL found, generate one manually using transaction ID
+                    if (string.IsNullOrEmpty(checkoutUrl) && !string.IsNullOrEmpty(transactionId))
+                    {
+                        checkoutUrl = $"https://a-checkout.coinpayments.net/checkout/?invoice-id={transactionId}";
+                        _logger.LogInformation("Generated manual CoinPayments checkout URL: {CheckoutUrl}", checkoutUrl);
+                    }
+
+                    if (!string.IsNullOrEmpty(checkoutUrl))
+                    {
+                        _logger.LogInformation("Using CoinPayments checkout URL: {CheckoutUrl} for transaction {TransactionId}",
+                            checkoutUrl, transactionId);
+
+                        return new PaymentResponse
+                        {
+                            Success = true,
+                            Message = "Redirecting to CoinPayments checkout",
+                            PaymentUrl = checkoutUrl, // Direct redirect to CoinPayments
+                            PSPTransactionId = transaction.PSPTransactionId,
+                            TransactionId = transactionId,
+                            AvailablePaymentMethods = new List<PaymentMethod>
+                            {
+                                new PaymentMethod
+                                {
+                                    Name = "Cryptocurrency Payment",
+                                    Type = "crypto",
+                                    Description = "Pay with cryptocurrency via CoinPayments",
+                                    IsEnabled = true,
+                                    IconUrl = "/icons/crypto.svg"
+                                }
+                            }
+                        };
+                    }
+                }
+
+                // Fallback if BitcoinPaymentService fails
+                _logger.LogWarning("Failed to get CoinPayments checkout URL, falling back to crypto-frontend");
+                var cryptoFrontendUrl = "http://localhost:3003";
                 var paymentParams = new Dictionary<string, string>
                 {
                     ["amount"] = request.Amount.ToString("F2"),
@@ -46,17 +128,14 @@ namespace PaymentServiceProvider.Services.Plugins
                     ["pspTransactionId"] = transaction.PSPTransactionId
                 };
 
-                // Build query string
                 var queryString = string.Join("&", paymentParams.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
-                var redirectUrl = $"{cryptoFrontendUrl}/payment?{queryString}";
-
-                _logger.LogInformation("Generated crypto payment URL: {PaymentUrl}", redirectUrl);
+                var fallbackUrl = $"{cryptoFrontendUrl}/payment?{queryString}";
 
                 return new PaymentResponse
                 {
                     Success = true,
                     Message = "Redirecting to cryptocurrency payment",
-                    PaymentUrl = redirectUrl,
+                    PaymentUrl = fallbackUrl,
                     PSPTransactionId = transaction.PSPTransactionId,
                     TransactionId = transaction.PSPTransactionId,
                     AvailablePaymentMethods = new List<PaymentMethod>

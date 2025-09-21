@@ -10,5 +10,7 @@ namespace BitcoinPaymentService.Interfaces
         Task<bool> IsPaymentExpiredAsync(string transactionId);
         Task<string> GetPaymentStatusAsync(string transactionId);
         Task<CreateInvoiceResponse?> CreateInvoiceAsync(CreateInvoiceRequest request);
+        Task<bool> RegisterWebhookAsync();
+        Task<bool> ListWebhooksAsync();
     }
 }

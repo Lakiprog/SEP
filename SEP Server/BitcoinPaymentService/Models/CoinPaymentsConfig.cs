@@ -7,5 +7,7 @@ namespace BitcoinPaymentService.Models
         public string BaseUrl { get; set; } = "https://a-api.coinpayments.net/api";
         public string ApiKey { get; set; } = string.Empty;
         public string ApiSecret { get; set; } = string.Empty;
+        public string WebhookUrl { get; set; } = string.Empty;
+        public string IpnUrl { get; set; } = string.Empty;
     }
 }
