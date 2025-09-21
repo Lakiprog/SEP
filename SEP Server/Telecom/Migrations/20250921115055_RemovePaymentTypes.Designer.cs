@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Telecom.Data;
 
@@ -11,9 +12,11 @@ using Telecom.Data;
 namespace Telecom.Migrations
 {
     [DbContext(typeof(TelecomDbContext))]
-    partial class TelecomDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250921115055_RemovePaymentTypes")]
+    partial class RemovePaymentTypes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -128,7 +131,7 @@ namespace Telecom.Migrations
                     b.Property<DateTime>("StartDate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 9, 21, 13, 54, 43, 396, DateTimeKind.Local).AddTicks(2045));
+                        .HasDefaultValue(new DateTime(2025, 9, 21, 13, 50, 54, 838, DateTimeKind.Local).AddTicks(2021));
 
                     b.Property<string>("Status")
                         .IsRequired()

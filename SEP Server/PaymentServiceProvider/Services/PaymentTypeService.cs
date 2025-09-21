@@ -88,6 +88,25 @@ namespace PaymentServiceProvider.Services
 
         public async Task<PaymentType> UpdatePaymentType(PaymentType paymentType)
         {
+            // Get the current payment type to check if we're disabling it
+            var currentPaymentType = await _paymentTypeRepository.Get(paymentType.Id);
+            if (currentPaymentType == null)
+                throw new Exception($"Payment Type with id {paymentType.Id} does not exist!");
+
+            // Check if trying to disable the payment method
+            if (currentPaymentType.IsEnabled && !paymentType.IsEnabled)
+            {
+                // Count how many payment methods are currently enabled
+                var allPaymentTypes = await _paymentTypeRepository.GetAll();
+                var enabledCount = allPaymentTypes.Count(pt => pt.IsEnabled == true);
+                
+                // If this is the only enabled payment method, prevent disabling it
+                if (enabledCount <= 1)
+                {
+                    throw new Exception("Cannot disable the last active payment method. At least one payment method must remain active.");
+                }
+            }
+
             return await _paymentTypeRepository.Update(paymentType.Id, paymentType);
         }
 
@@ -97,6 +116,35 @@ namespace PaymentServiceProvider.Services
 
             if (paymentType == null) 
                 throw new Exception($"Payment Type with id {id} does not exist!");
+
+            // Check if this is the only active payment method
+            if (paymentType.IsEnabled)
+            {
+                var allPaymentTypes = await _paymentTypeRepository.GetAll();
+                var enabledCount = allPaymentTypes.Count(pt => pt.IsEnabled == true);
+                
+                if (enabledCount <= 1)
+                {
+                    throw new Exception("Cannot delete the last active payment method. At least one payment method must remain active.");
+                }
+            }
+
+            // Check if there are any transactions using this payment method
+            // Note: This would require access to transaction repository, but for now we'll rely on the controller validation
+            // In a real implementation, you might want to inject ITransactionRepository or check through the context
+
+            // Automatically remove all client associations before deleting the payment method
+            var allClientPaymentTypes = await _webShopClientPaymentTypesRepository.GetAll();
+            var associationsToRemove = allClientPaymentTypes.Where(cpt => cpt.PaymentTypeId == id).ToList();
+            
+            if (associationsToRemove.Any())
+            {
+                // Remove all associations
+                foreach (var association in associationsToRemove)
+                {
+                    await _webShopClientPaymentTypesRepository.Delete(association.Id);
+                }
+            }
 
             var deleted = await _paymentTypeRepository.Delete(id);
 

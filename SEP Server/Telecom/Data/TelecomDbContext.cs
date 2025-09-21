@@ -10,7 +10,6 @@ namespace Telecom.Data
         }
 
         public DbSet<PackageDeal> PackageDeals {  get; set; }
-        public DbSet<PaymentType> PaymentTypes { get; set; }
         public DbSet<Subscription> Subscriptions { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Category> Categories { get; set; }

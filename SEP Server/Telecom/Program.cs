@@ -97,19 +97,6 @@ using (var scope = app.Services.CreateScope())
         context.SaveChanges();
     }
     
-    // Seed payment types if they don't exist
-    if (!context.PaymentTypes.Any())
-    {
-        var paymentTypes = new List<PaymentType>
-        {
-            new PaymentType { Type = "card", Name = "Credit Card", Description = "Pay with credit or debit card", IsEnabled = true, CreatedAt = DateTime.UtcNow },
-            new PaymentType { Type = "qr", Name = "QR Code", Description = "Pay with QR code", IsEnabled = true, CreatedAt = DateTime.UtcNow },
-            new PaymentType { Type = "paypal", Name = "PayPal", Description = "Pay with PayPal", IsEnabled = true, CreatedAt = DateTime.UtcNow },
-            new PaymentType { Type = "bitcoin", Name = "Bitcoin", Description = "Pay with Bitcoin", IsEnabled = true, CreatedAt = DateTime.UtcNow }
-        };
-        context.PaymentTypes.AddRange(paymentTypes);
-        context.SaveChanges();
-    }
     
     // Seed packages if they don't exist
     if (!context.PackageDeals.Any())

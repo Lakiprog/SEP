@@ -69,15 +69,7 @@ const Layout = ({ children, onLogout }) => {
             <FaExternalLinkAlt className="external-icon" />
           </a>
           
-          <a
-            href="/telecom-demo"
-            className="nav-item telecom-link"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <FaShoppingCart className="nav-icon" />
-            <span className="nav-label">Telecom Demo</span>
-            <FaExternalLinkAlt className="external-icon" />
-          </a>
+          
         </nav>
       </div>
 

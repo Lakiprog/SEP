@@ -276,13 +276,23 @@ const PaymentMethodsSettings = ({ clientId }) => {
   }, [clientId, loadPaymentMethods]);
 
   const handleTogglePaymentMethod = (paymentMethodId) => {
-    setPaymentMethods(prev => 
-      prev.map(pm => 
+    setPaymentMethods(prev => {
+      const currentlySelected = prev.filter(pm => pm.isSelected).length;
+      const methodToToggle = prev.find(pm => pm.id === paymentMethodId);
+      
+      // If trying to disable the last selected payment method, show error
+      if (methodToToggle.isSelected && currentlySelected <= 1) {
+        setError('Cannot disable the last active payment method. At least one payment method must remain active.');
+        setTimeout(() => setError(null), 5000);
+        return prev; // Don't update state
+      }
+      
+      return prev.map(pm => 
         pm.id === paymentMethodId 
           ? { ...pm, isSelected: !pm.isSelected }
           : pm
-      )
-    );
+      );
+    });
   };
 
   const handleSave = async () => {
@@ -293,6 +303,13 @@ const PaymentMethodsSettings = ({ clientId }) => {
       const selectedPaymentTypeIds = paymentMethods
         .filter(pm => pm.isSelected)
         .map(pm => pm.id);
+
+      // Additional validation before saving
+      if (selectedPaymentTypeIds.length === 0) {
+        setError('At least one payment method must be selected.');
+        setTimeout(() => setError(null), 5000);
+        return;
+      }
 
       await webShopAPI.updatePaymentMethods(clientId, {
         selectedPaymentTypeIds
@@ -353,10 +370,15 @@ const PaymentMethodsSettings = ({ clientId }) => {
                   type="checkbox"
                   checked={method.isSelected}
                   onChange={() => handleTogglePaymentMethod(method.id)}
-                  disabled={saving}
+                  disabled={saving || (method.isSelected && paymentMethods.filter(pm => pm.isSelected).length <= 1)}
                 />
                 <span className="slider"></span>
               </label>
+              {method.isSelected && paymentMethods.filter(pm => pm.isSelected).length <= 1 && (
+                <span className="warning-text">
+                  (Cannot disable - this is the only active payment method)
+                </span>
+              )}
             </div>
           </div>
         ))}

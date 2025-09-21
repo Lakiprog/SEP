@@ -644,5 +644,22 @@ input:checked + .slider:before {
 
   .method-toggle {
     align-self: flex-end;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 4px;
   }
+  
+  .method-toggle .toggle-switch {
+    margin-bottom: 0;
+  }
+}
+
+/* Warning text styles */
+.warning-text {
+  color: #ff6b6b !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  margin-left: 8px;
+  white-space: nowrap;
 }
